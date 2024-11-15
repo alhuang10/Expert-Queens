@@ -10,6 +10,7 @@ class GameState:
     def __init__(self, n=8):
         self.n = n
         self.queens = generate_random_queens(n)
+        print(f"Queens: {self.queens}")
         self.regions = generate_regions(self.queens, n)
         self.marks = np.zeros((n, n), dtype=int)  # 0: unmarked, 1: X, 2: queen
         
