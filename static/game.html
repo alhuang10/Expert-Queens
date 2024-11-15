@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Queen Puzzle Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        
+        .board {
+            display: inline-grid;
+            gap: 1px;
+            background: #333;
+            padding: 1px;
+            margin: 20px;
+        }
+        
+        .cell {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .cell:hover {
+            opacity: 0.8;
+        }
+        
+        .mark-x {
+            font-weight: bold;
+        }
+        
+        .mark-queen {
+            font-weight: bold;
+            font-size: 36px;
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        
+        button {
+            font-size: 1rem;
+            padding: 0.5rem 1rem;
+            margin: 0.5rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="controls">
+            <button @click="backToMenu">Back to Menu</button>
+        </div>
+        <div class="board" :style="boardStyle">
+            <template v-for="(row, i) in state.regions">
+                <div v-for="(cell, j) in row" 
+                     :key="`${i}-${j}`"
+                     class="cell"
+                     :style="getCellStyle(i, j)"
+                     @click="toggleMark(i, j)">
+                    <span v-if="state.marks[i][j] === 1" class="mark-x">X</span>
+                    <span v-if="state.marks[i][j] === 2" class="mark-queen">Q</span>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        const app = createApp({
+            data() {
+                return {
+                    state: {
+                        regions: [],
+                        marks: [],
+                        size: 8
+                    },
+                    // 15 distinct colors optimized for visibility
+                    colors: [
+                        '#FF0000', // Red
+                        '#00FF00', // Lime
+                        '#0000FF', // Blue
+                        '#FFD700', // Gold
+                        '#FF00FF', // Magenta
+                        '#00FFFF', // Cyan
+                        '#FF8C00', // Dark Orange
+                        '#8B4513', // Saddle Brown
+                        '#98FF98', // Mint Green
+                        '#32CD32', // Lime Green
+                        '#FF69B4', // Hot Pink
+                        '#8A2BE2', // Blue Violet
+                        '#00CED1', // Dark Turquoise
+                        '#FF4500', // Orange Red
+                        '#2E8B57'  // Sea Green
+                    ]
+                }
+            },
+            computed: {
+                boardStyle() {
+                    return {
+                        'grid-template-columns': `repeat(${this.state.size}, 60px)`
+                    }
+                }
+            },
+            methods: {
+                getCellStyle(i, j) {
+                    return {
+                        backgroundColor: this.colors[this.state.regions[i][j]]
+                    }
+                },
+                async toggleMark(i, j) {
+                    const response = await fetch(`/api/toggle/${i}/${j}`);
+                    const data = await response.json();
+                    this.state.marks[i][j] = data.mark;
+                },
+                async loadState() {
+                    const response = await fetch('/api/state');
+                    if (response.ok) {
+                        this.state = await response.json();
+                    } else {
+                        window.location.href = '/';
+                    }
+                },
+                backToMenu() {
+                    window.location.href = '/';
+                }
+            },
+            mounted() {
+                this.loadState();
+            }
+        });
+
+        app.mount('#app');
+    </script>
+</body>
+</html>
