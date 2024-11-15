@@ -42,8 +42,9 @@
         }
         
         .mark-queen {
-            font-weight: bold;
-            font-size: 36px;
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
         }
         
         .controls {
@@ -137,7 +138,10 @@
                      :style="getCellStyle(i, j)"
                      @click="toggleMark(i, j)">
                     <span v-if="state.marks[i][j] === 1" class="mark-x">X</span>
-                    <span v-if="state.marks[i][j] === 2" class="mark-queen">Q</span>
+                    <img v-if="state.marks[i][j] === 2" 
+                         src="/static/black_queen_logo.png" 
+                         alt="Queen" 
+                         class="mark-queen">
                 </div>
             </template>
         </div>

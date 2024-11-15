@@ -3,7 +3,7 @@ from flask_cors import CORS
 import numpy as np
 from board_generator import generate_random_queens, generate_regions
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/static')
 CORS(app)
 
 class GameState:
@@ -56,6 +56,10 @@ def serve_landing():
 @app.route('/game')
 def serve_game():
     return send_from_directory('static', 'game.html')
+
+@app.route('/static/<path:path>')
+def send_static(path):
+    return send_from_directory('static', path)
 
 if __name__ == '__main__':
     app.run(debug=True)
