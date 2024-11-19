@@ -100,6 +100,108 @@ def generate_random_queens(n: int = 8) -> List[Tuple[int, int]]:
             # print(f"Getting a queen arrangement took {time.time() - start_time} sec")
             return result
 
+from typing import List, Tuple
+import numpy as np
+import random
+
+def score_queen_configuration(queens: List[Tuple[int, int]], n: int) -> float:
+    """
+    Score a queen configuration based on properties that might lead to unique color solutions.
+    Higher score is better.
+    """
+    score = 0.0
+    
+    # Helper to get distances between queens
+    def manhattan_dist(q1: Tuple[int, int], q2: Tuple[int, int]) -> int:
+        return abs(q1[0] - q2[0]) + abs(q1[1] - q2[1])
+    
+    def diagonal_dist(q1: Tuple[int, int], q2: Tuple[int, int]) -> int:
+        return max(abs(q1[0] - q2[0]), abs(q1[1] - q2[1]))
+    
+    # 1. Score clustering - we want some clustering but not too much
+    distances = []
+    for i, q1 in enumerate(queens):
+        for j, q2 in enumerate(queens):
+            if i < j:
+                dist = manhattan_dist(q1, q2)
+                distances.append(dist)
+    
+    # Prefer a mix of distances - calculate standard deviation
+    # Higher std dev means more variety in spacing
+    if distances:
+        distance_std = np.std(distances)
+        score += distance_std * 0.5
+    
+    # 2. Score diagonal relationships
+    # diagonal_pairs = 0
+    # for i, q1 in enumerate(queens):
+    #     for j, q2 in enumerate(queens):
+    #         if i < j:
+    #             if abs(q1[0] - q2[0]) == abs(q1[1] - q2[1]):
+    #                 diagonal_pairs += 1
+    # score += diagonal_pairs * 0.3  # Reward some diagonal relationships
+    
+    # 3. Score edge/center balance
+    edge_queens = sum(1 for r, c in queens if r in [0, n-1] or c in [0, n-1])
+    ideal_edge_queens = len(queens) / 3  # Want roughly 1/3 on edges
+    score -= abs(edge_queens - ideal_edge_queens) * 0.4
+    
+    # 4. Penalize too-uniform spacing
+    all_dists = set(distances)
+    if len(all_dists) < len(queens) / 2:  # Too few unique distances
+        score -= 1.0
+        
+    return score
+
+def generate_queens_heuristic(n: int, num_attempts: int = 100) -> List[Tuple[int, int]]:
+    """
+    Generate a queen configuration optimized for unique color solutions.
+    """
+    def is_valid_position(queens: List[Tuple[int, int]], new_pos: Tuple[int, int]) -> bool:
+        """Check if new position violates queen placement rules"""
+        row, col = new_pos
+        for qr, qc in queens:
+            # Check row/column conflicts
+            if row == qr or col == qc:
+                return False
+            # Check adjacency (including diagonal)
+            if abs(row - qr) <= 1 and abs(col - qc) <= 1:
+                return False
+        return True
+    
+    best_queens = None
+    best_score = float('-inf')
+    
+    for _ in range(num_attempts):
+        queens = []
+        available_positions = [(r, c) for r in range(n) for c in range(n)]
+        random.shuffle(available_positions)
+        
+        # Place queens one at a time
+        while len(queens) < n and available_positions:
+            placed = False
+            for pos in available_positions[:]:
+                if is_valid_position(queens, pos):
+                    queens.append(pos)
+                    available_positions.remove(pos)
+                    placed = True
+                    break
+            
+            if not placed:
+                break
+        
+        # Score this configuration if we placed all queens
+        if len(queens) == n:
+            score = score_queen_configuration(queens, n)
+            if score > best_score:
+                best_score = score
+                best_queens = queens.copy()
+    
+    if best_queens is None:
+        raise ValueError("Could not find valid queen configuration")
+        
+    return best_queens
+
 
 # Verify the solution
 def verify_solution(positions: List[Tuple[int, int]], n: int) -> bool:
@@ -214,7 +316,19 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> np.nda
                 adjacent.append((new_row, new_col))
         return adjacent
     
-    def get_spindly_score(row: int, col: int, color: int) -> float:
+    def softmax(scores: List[float], temperature: float = 1.0) -> List[float]:
+        """
+        Convert scores to probabilities using softmax with temperature.
+        Higher temperature = more random, Lower = more deterministic
+        """
+        # Shift scores to avoid overflow
+        scores = np.array(scores)
+        scores = scores - np.max(scores)
+        exp_scores = np.exp(scores / temperature)
+        return exp_scores / exp_scores.sum()
+
+    
+    def get_spindly_score(row: int, col: int, color: int, queens) -> float:
         """
         Calculate how 'spindly' placing color at this position would be.
         Higher score = more jagged/spindly (preferred)
@@ -248,7 +362,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> np.nda
             
             # For each adjacent color, calculate spindly score
             for color in adj_colors:
-                score = get_spindly_score(row, col, color)
+                score = get_spindly_score(row, col, color, queens)
                 candidates.append((score, (row, col, color)))
         
         if not candidates:
@@ -271,16 +385,28 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> np.nda
                 # Termination condition: if none of the candidates work then return 
                 #   None and try again with new starting state in the outer loop
                 if not candidates:
-                    # visualize_regions_queens(board, queens)
+                    visualize_regions_queens(board, queens)
                     print("Went through all candidates, restarting by returning None!")
                     return None
                 
-                # Chose a candidate that has the highest score
-                max_score = max(score for score, _ in candidates)
-                best_candidates = [(score, (r, c, color)) for score, (r, c, color) in candidates 
-                                if score == max_score]
-                best_score, (row, col, color) = random.choice(best_candidates)
-            
+                # Method 1: Chose a candidate from ones with the highest score
+                # max_score = max(score for score, _ in candidates)
+                # best_candidates = [(score, (r, c, color)) for score, (r, c, color) in candidates 
+                #                 if score == max_score]
+                # selected_score, (row, col, color) = random.choice(best_candidates)
+                # print(f"Selected Score: {selected_score}")
+
+                # Method 2: Sample from candidates
+                # scores = [score for score, _ in candidates]
+                scores = [score for score, _ in candidates]
+                positions = [(r, c, color) for _, (r, c, color) in candidates]
+                probabilities = softmax([x+2 for x in scores], temperature=0.2)
+    
+                # Choose based on probabilities instead of just the max
+                selected_idx = np.random.choice(len(positions), p=probabilities)
+                row, col, color = positions[selected_idx]
+                selected_score = scores[selected_idx]
+                
                 # Test if the resulting board is single solution
                 board[row, col] = color
 
@@ -296,7 +422,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> np.nda
                     # Undo the color marking and remove from candidates
                     # print("REJECTED CANDIDATE")
                     board[row, col] = -1  # TODO: maybe just duplicate board if it gets messy?
-                    candidates.remove((best_score, (row, col, color)))
+                    candidates.remove((selected_score, (row, col, color)))
     
     return board
 
@@ -547,6 +673,7 @@ def find_unique_solution_board(n: int, max_attempts: int = 1000000) -> Optional[
     for attempt_num in range(max_attempts):
         # board = generate_regions(queens, n)    
         queens = generate_random_queens(n)
+        # visualize_queens(queens, n=n)
 
         # board = generate_regions_optimized(queens, n)
         board = generate_regions_jagged(queens, n)
