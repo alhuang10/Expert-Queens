@@ -99,7 +99,8 @@ def generate_random_queens(n: int = 8) -> List[Tuple[int, int]]:
         return True
 
     def backtrack(queens: List[Tuple[int, int]], 
-                 remaining_positions: List[Tuple[int, int]]) -> Optional[List[Tuple[int, int]]]:
+                  remaining_positions: List[Tuple[int, int]]
+                  ) -> Optional[List[Tuple[int, int]]]:
         if len(queens) == n:
             return queens
             
@@ -203,6 +204,30 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
         
         return diff_color - (same_color * 1.5) + color_banned_penalty
     
+    def is_symmetry_swap_constrained(proposed_color_queen_loc: Tuple[int, int],
+                                     conflicting_queen_loc: Tuple[int, int],
+                                     queens_to_check: List[Tuple[int, int]]
+                                     ) -> True:
+        """
+        For mirror swapping two queens, check the resulting positions to see if there 
+        are other queens that conflict with the resulting position.
+
+        If there is a neighbor conflict, then we don't have to worry about this 
+        symmetry case.
+
+        Queens to check shouldn't include the current color queen and conflicting queen
+        """
+        proposed_color_queen_loc_surroundings = get_adjacent_cells_diag(
+            *proposed_color_queen_loc)
+        conflicting_queen_loc_surroundings = get_adjacent_cells_diag(
+            *conflicting_queen_loc)
+
+        for q in queens_to_check:
+            if q in proposed_color_queen_loc_surroundings or \
+                    q in conflicting_queen_loc_surroundings:
+                return True
+        return False
+
     # Initialize board with -1 (uncolored)
     board = np.full((n, n), -1)
     
@@ -244,7 +269,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
             # If run out of valid candidates, we reached a dead end so return None
             if not candidates:
                 # visualize_regions_queens(board, queens)
-                print("Reached a dead end of a genration, restarting!")
+                print("Reached a dead end board coloring, restarting!")
                 return None
         
             # Probabilistically sample from candidates
@@ -272,106 +297,67 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
 
                 # Here we can do the symmetry check for when the proposed color is on 
                 #   the same row or column as the original queen
-                queen_loc_of_color = color_to_queen_loc[color]
+                # Basic idea is that when you add a color to the same row/column as the
+                #   queen of that color, if you hypothetically were to move the queen
+                #   to that new square, there is at least ONE other queen that would
+                #   be in conflict with that, "the conflicting queen"
+                # If the conflicting queen were able to mirror the position without
+                #   running into conflicts, it would necessarily result in a non-unique
+                #   solution, so we need to proactively mark the square the conflicting
+                #   queen would reflect to as not allowed for that color if unassigned 
+                queen_of_proposed_color_loc = color_to_queen_loc[color]
 
-                if queen_loc_of_color[0] == proposed_row:
-                    # Use the column to find the queen of that column
-                    conflicting_queen_loc = None
+                if queen_of_proposed_color_loc[0] == proposed_row:
+                    # Conflicting queen is the queen in the proposed column
+                    conflicting_queen_loc = next(q for q in queens if q[1] == proposed_col)
 
-                    for queen_loc in queens:
-                        if queen_loc[1] == proposed_col:
-                            conflicting_queen_loc = queen_loc
-                            break
-
-                    assert conflicting_queen_loc is not None  # TODO: remove
-
-                    new_potential_current_queen_loc = (proposed_row,
-                                                        proposed_col)
-                    # Conflicting potential is current queen col, same row
-                    new_potential_conflicting_queen_loc = (conflicting_queen_loc[0],
-                                                            queen_loc_of_color[1])
+                    potential_proposed_color_queen_loc = (proposed_row,
+                                                          proposed_col)
+                    # Square conflict queen would move to mirroring proposed color queen
+                    potential_conflicting_queen_loc = (conflicting_queen_loc[0],
+                                                       queen_of_proposed_color_loc[1])
                     
                     # Only do this check if the conflicting potential square uncolored
-                    if board[new_potential_conflicting_queen_loc] == -1:
-                        # Check immediate neighbors of both. If there is no neighboring
-                        #   queen in either new potential spot then we have to mark
-                        #   a forbidden color. Ignore the queen of the same color when looking
-                        new_potential_current_queen_surroundings = \
-                            get_adjacent_cells_diag(new_potential_current_queen_loc[0],
-                                                    new_potential_current_queen_loc[1])
-                        if queen_loc_of_color in new_potential_current_queen_surroundings:
-                            new_potential_current_queen_surroundings.remove(queen_loc_of_color)
-
-                        new_potential_conflicting_queen_surroundings = \
-                            get_adjacent_cells_diag(new_potential_conflicting_queen_loc[0],
-                                                    new_potential_conflicting_queen_loc[1])
-                        if conflicting_queen_loc in new_potential_conflicting_queen_surroundings:
-                            new_potential_conflicting_queen_surroundings.remove(conflicting_queen_loc)
-                        
-                        found_neighbor_queen_in_new_potential_loc = False
-                        for q in queens:
-                            if q in new_potential_current_queen_surroundings:
-                                # print("found neighbor queen for current potential", q)
-                                found_neighbor_queen_in_new_potential_loc = True
-                                break
-                            if q in new_potential_conflicting_queen_surroundings:
-                                # print("found neighbor queen for conflicting potential", q)
-                                found_neighbor_queen_in_new_potential_loc = True
-                                break
-                        
-                        if not found_neighbor_queen_in_new_potential_loc:
-                            square_to_disallowed_color_mapping[new_potential_conflicting_queen_loc].append(
-                                int(board[conflicting_queen_loc]))
-                            # print(f"No neighbor conflicts found, need to mark illegal color of {board[conflicting_queen_loc]}")                        
-
-                elif queen_loc_of_color[1] == proposed_col:
-                    # Use the row to find the queen of that row
-                    conflicting_queen_loc = None
-
-                    for queen_loc in queens:
-                        if queen_loc[0] == proposed_row:
-                            conflicting_queen_loc = queen_loc
-                            break
-
-                    assert conflicting_queen_loc is not None  # TODO: remove
-                    # Current potential is where we will place new color
-                    new_potential_current_queen_loc = (proposed_row,
-                                                        proposed_col)
-                    # Conflicting potential is current queen row, same col
-                    new_potential_conflicting_queen_loc = (queen_loc_of_color[0],
-                                                            conflicting_queen_loc[1])
-                    # Only do this check if the conflicting potential square uncolored
-                    if board[new_potential_conflicting_queen_loc] == -1:
-                        # Check immediate neighbors of both. If there is no neighboring
-                        #   queen in either new potential spot then we have to mark
-                        #   a forbidden color. Ignore the queen of the same color when looking
-                        new_potential_current_queen_surroundings = \
-                            get_adjacent_cells_diag(new_potential_current_queen_loc[0],
-                                                    new_potential_current_queen_loc[1])
-                        new_potential_conflicting_queen_surroundings = \
-                            get_adjacent_cells_diag(new_potential_conflicting_queen_loc[0],
-                                                    new_potential_conflicting_queen_loc[1])
-
-                        found_neighbor_queen_in_new_potential_loc = False
+                    if board[potential_conflicting_queen_loc] == -1:
                         # ignore the swapping queens
                         queens_to_check = [q for q in queens
-                                        if q != queen_loc_of_color
-                                        if q != conflicting_queen_loc]
-                        assert len(queens_to_check) == (n - 2)
-                        for q in queens_to_check:
-                            if q in new_potential_current_queen_surroundings:
-                                # print("found neighbor queen for current potential", q)
-                                found_neighbor_queen_in_new_potential_loc = True
-                                break
-                            if q in new_potential_conflicting_queen_surroundings:
-                                # print("found neighbor queen for conflicting potential", q)
-                                found_neighbor_queen_in_new_potential_loc = True
-                                break
+                                           if q != queen_of_proposed_color_loc
+                                           if q != conflicting_queen_loc]
                         
-                        if not found_neighbor_queen_in_new_potential_loc:
-                            square_to_disallowed_color_mapping[new_potential_conflicting_queen_loc].append(
-                                int(board[conflicting_queen_loc]))
-                            # print(f"No neighbor conflicts found, need to mark illegal color of {board[conflicting_queen_loc]}")
+                        symmetry_swap_constrained = is_symmetry_swap_constrained(
+                            potential_proposed_color_queen_loc,
+                            potential_conflicting_queen_loc,
+                            queens_to_check
+                        )
+                        if not symmetry_swap_constrained:
+                            conflicting_queen_color = int(board[conflicting_queen_loc])
+                            square_to_disallowed_color_mapping[potential_conflicting_queen_loc].append(
+                                conflicting_queen_color)
+
+                elif queen_of_proposed_color_loc[1] == proposed_col:
+                    # Conflicting queen is the queen in the proposed row
+                    conflicting_queen_loc = next(q for q in queens if q[0] == proposed_row)
+
+                    potential_proposed_color_queen_loc = (proposed_row,
+                                                          proposed_col)
+                    # Square conflict queen would move to mirroring proposed color queen
+                    potential_conflicting_queen_loc = (queen_of_proposed_color_loc[0],
+                                                       conflicting_queen_loc[1])
+                    # Only do this check if the conflicting potential square uncolored
+                    if board[potential_conflicting_queen_loc] == -1:
+                        # ignore the swapping queens
+                        queens_to_check = [q for q in queens
+                                          if q != queen_of_proposed_color_loc
+                                          if q != conflicting_queen_loc]
+                        symmetry_swap_constrained = is_symmetry_swap_constrained(
+                            potential_proposed_color_queen_loc,
+                            potential_conflicting_queen_loc,
+                            queens_to_check
+                        )
+                        if not symmetry_swap_constrained:
+                            conflicting_queen_color = int(board[conflicting_queen_loc])
+                            square_to_disallowed_color_mapping[potential_conflicting_queen_loc].append(
+                                conflicting_queen_color)
 
             else:
                 # Found multiple solutions, undo color and remove from candidates
