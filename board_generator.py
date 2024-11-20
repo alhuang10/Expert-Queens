@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from typing import List, Set, Tuple, Optional, Dict
 from collections import defaultdict
 
-from get_solutions import find_up_to_two_solutions
+from get_solutions import find_up_to_two_solutions_optimized
 
 
 def visualize_queens(positions: List[Tuple[int, int]], n: int = 8):
@@ -270,6 +270,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8
         while not next_color_found:
             # If run out of valid candidates, we reached a dead end so return None
             if not candidates:
+                # print(repr(board))
                 # visualize_regions_queens(board, queens)
                 print("Reached a dead end board coloring, restarting!")
                 return None
@@ -290,7 +291,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8
 
             # Test if the resulting board is single solution
             board[proposed_row, proposed_col] = color
-            solutions = find_up_to_two_solutions(board)
+            solutions = find_up_to_two_solutions_optimized(board)
 
             if len(solutions) == 1:
                 # If so, mark next_color_found as True and visualize
@@ -390,7 +391,7 @@ def find_unique_solution_board(n: int, max_attempts: int = 100) -> Optional[np.n
             print(f"Found unique solution board after {attempt_num} attempts")
             attempt_time = time.time() - start_time
             print(f"Took {attempt_time:.2f} seconds")
-            print(board)
+            print(repr(board))
             print(queens)
             return board, queens
 
