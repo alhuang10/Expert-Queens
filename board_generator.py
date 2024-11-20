@@ -303,9 +303,12 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> np.nda
     
     # Assign random colors to queens
     colors = list(range(len(queens)))
+    color_to_queen_loc = {}
+
     random.shuffle(colors)
     for (row, col), color in zip(queens, colors):
         board[row, col] = color
+        color_to_queen_loc[color] = (row, col)
 
     def get_adjacent_cells(row: int, col: int) -> List[Tuple[int, int]]:
         """Get orthogonally adjacent cells"""
@@ -314,6 +317,17 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> np.nda
             new_row, new_col = row + dr, col + dc
             if 0 <= new_row < n and 0 <= new_col < n:
                 adjacent.append((new_row, new_col))
+        return adjacent
+    
+    def get_adjacent_cells_diag(row: int, col: int) -> List[Tuple[int, int]]:
+        """Get all adjacent cells including diagonals"""
+        adjacent = []
+        for dr in [-1, 0, 1]:
+            for dc in [-1, 0, 1]:
+                if dr != 0 or dc != 0:
+                    new_row, new_col = row + dr, col + dc
+                    if 0 <= new_row < n and 0 <= new_col < n:
+                        adjacent.append((new_row, new_col))
         return adjacent
     
     def softmax(scores: List[float], temperature: float = 1.0) -> List[float]:
@@ -328,7 +342,8 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> np.nda
         return exp_scores / exp_scores.sum()
 
     
-    def get_spindly_score(row: int, col: int, color: int, queens) -> float:
+    def get_spindly_score(row: int, col: int, color: int, queens,
+                          square_to_disallowed_color_mapping) -> float:
         """
         Calculate how 'spindly' placing color at this position would be.
         Higher score = more jagged/spindly (preferred)
@@ -343,16 +358,32 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> np.nda
                 same_color += 1
             elif board[adj_row, adj_col] != -1:
                 diff_color += 1
-                
+
+        found_banned_square_adjacent = False
+        neighbors_of_potential_spot = get_adjacent_cells(row, col)
+
+        for n in neighbors_of_potential_spot:
+            if color in square_to_disallowed_color_mapping[n]:
+                found_banned_square_adjacent = True
+
+        color_banned_penalty = 0
+        if found_banned_square_adjacent:
+            color_banned_penalty = -10
+        
+
         # Prefer positions that:
         # 1. Have few neighbors of same color (creates thin regions)
         # 2. Have many neighbors of different colors (creates jagged boundaries)
-        return diff_color - (same_color * 1.5)
+        # 3. Not marking next to a banned color
+        return diff_color - (same_color * 1.5) + color_banned_penalty
     
     # Keep track of uncolored cells
     uncolored_cells = set((i, j) for i in range(n) for j in range(n) 
                          if board[i, j] == -1)
     
+    # Using symmetry test to mark disallowed colors
+    square_to_disallowed_color_mapping = defaultdict(list)  # (row, col) -> list(int)
+
     while uncolored_cells:
         # Find all uncolored cells adjacent to colored regions
         candidates = []
@@ -362,7 +393,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> np.nda
             
             # For each adjacent color, calculate spindly score
             for color in adj_colors:
-                score = get_spindly_score(row, col, color, queens)
+                score = get_spindly_score(row, col, color, queens, square_to_disallowed_color_mapping)
                 candidates.append((score, (row, col, color)))
         
         if not candidates:
@@ -385,7 +416,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> np.nda
                 # Termination condition: if none of the candidates work then return 
                 #   None and try again with new starting state in the outer loop
                 if not candidates:
-                    visualize_regions_queens(board, queens)
+                    # visualize_regions_queens(board, queens)
                     print("Went through all candidates, restarting by returning None!")
                     return None
                 
@@ -407,6 +438,12 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> np.nda
                 row, col, color = positions[selected_idx]
                 selected_score = scores[selected_idx]
                 
+                # See if the color at that position is banned square color 
+                if color in square_to_disallowed_color_mapping[(row, col)]:
+                    candidates.remove((selected_score, (row, col, color)))
+                    # print("Rejected candidate due to color, next choice")
+                    continue
+
                 # Test if the resulting board is single solution
                 board[row, col] = color
 
@@ -418,6 +455,110 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> np.nda
                     uncolored_cells.remove((row, col))
 
                     # visualize_regions_queens(board, queens)
+
+                    # Here we can do the symmetry check for when the color is on the
+                    #   same row or column as the original queen
+                    queen_loc_of_color = color_to_queen_loc[color]
+
+                    if queen_loc_of_color[0] == row:
+                        # Use the column to find the queen of that column
+                        conflicting_queen_loc = None
+
+                        for queen_loc in queens:
+                            if queen_loc[1] == col:
+                                conflicting_queen_loc = queen_loc
+                                break
+
+                        assert conflicting_queen_loc is not None  # TODO: remove
+
+                        new_potential_current_queen_loc = (row,
+                                                           col)
+                        # Conflicting potential is current queen col, same row
+                        new_potential_conflicting_queen_loc = (conflicting_queen_loc[0],
+                                                               queen_loc_of_color[1])
+                        
+                        # Only do this check if the conflicting potential square uncolored
+                        if board[new_potential_conflicting_queen_loc] == -1:
+                            # Check immediate neighbors of both. If there is no neighboring
+                            #   queen in either new potential spot then we have to mark
+                            #   a forbidden color. Ignore the queen of the same color when looking
+                            new_potential_current_queen_surroundings = \
+                                get_adjacent_cells_diag(new_potential_current_queen_loc[0],
+                                                        new_potential_current_queen_loc[1])
+                            if queen_loc_of_color in new_potential_current_queen_surroundings:
+                                new_potential_current_queen_surroundings.remove(queen_loc_of_color)
+
+                            new_potential_conflicting_queen_surroundings = \
+                                get_adjacent_cells_diag(new_potential_conflicting_queen_loc[0],
+                                                        new_potential_conflicting_queen_loc[1])
+                            if conflicting_queen_loc in new_potential_conflicting_queen_surroundings:
+                                new_potential_conflicting_queen_surroundings.remove(conflicting_queen_loc)
+                            
+                            found_neighbor_queen_in_new_potential_loc = False
+                            for q in queens:
+                                if q in new_potential_current_queen_surroundings:
+                                    # print("found neighbor queen for current potential", q)
+                                    found_neighbor_queen_in_new_potential_loc = True
+                                    break
+                                if q in new_potential_conflicting_queen_surroundings:
+                                    # print("found neighbor queen for conflicting potential", q)
+                                    found_neighbor_queen_in_new_potential_loc = True
+                                    break
+                            
+                            if not found_neighbor_queen_in_new_potential_loc:
+                                square_to_disallowed_color_mapping[new_potential_conflicting_queen_loc].append(
+                                    int(board[conflicting_queen_loc]))
+                                # print(f"No neighbor conflicts found, need to mark illegal color of {board[conflicting_queen_loc]}")                        
+
+                    elif queen_loc_of_color[1] == col:
+                        # Use the row to find the queen of that row
+                        conflicting_queen_loc = None
+
+                        for queen_loc in queens:
+                            if queen_loc[0] == row:
+                                conflicting_queen_loc = queen_loc
+                                break
+
+                        assert conflicting_queen_loc is not None  # TODO: remove
+                        # Current potential is where we will place new color
+                        new_potential_current_queen_loc = (row,
+                                                           col)
+                        # Conflicting potential is current queen row, same col
+                        new_potential_conflicting_queen_loc = (queen_loc_of_color[0],
+                                                               conflicting_queen_loc[1])
+                        # Only do this check if the conflicting potential square uncolored
+                        if board[new_potential_conflicting_queen_loc] == -1:
+                            # Check immediate neighbors of both. If there is no neighboring
+                            #   queen in either new potential spot then we have to mark
+                            #   a forbidden color. Ignore the queen of the same color when looking
+                            new_potential_current_queen_surroundings = \
+                                get_adjacent_cells_diag(new_potential_current_queen_loc[0],
+                                                        new_potential_current_queen_loc[1])
+                            new_potential_conflicting_queen_surroundings = \
+                                get_adjacent_cells_diag(new_potential_conflicting_queen_loc[0],
+                                                        new_potential_conflicting_queen_loc[1])
+
+                            found_neighbor_queen_in_new_potential_loc = False
+                            # ignore the swapping queens
+                            queens_to_check = [q for q in queens
+                                            if q != queen_loc_of_color
+                                            if q != conflicting_queen_loc]
+                            assert len(queens_to_check) == (n - 2)
+                            for q in queens_to_check:
+                                if q in new_potential_current_queen_surroundings:
+                                    # print("found neighbor queen for current potential", q)
+                                    found_neighbor_queen_in_new_potential_loc = True
+                                    break
+                                if q in new_potential_conflicting_queen_surroundings:
+                                    # print("found neighbor queen for conflicting potential", q)
+                                    found_neighbor_queen_in_new_potential_loc = True
+                                    break
+                            
+                            if not found_neighbor_queen_in_new_potential_loc:
+                                square_to_disallowed_color_mapping[new_potential_conflicting_queen_loc].append(
+                                    int(board[conflicting_queen_loc]))
+                                # print(f"No neighbor conflicts found, need to mark illegal color of {board[conflicting_queen_loc]}")
+
                 else:  # Either 0 or 2 solutions, 0 probably can't happen since we start with valid queens
                     # Undo the color marking and remove from candidates
                     # print("REJECTED CANDIDATE")
@@ -701,7 +842,7 @@ def find_unique_solution_board(n: int, max_attempts: int = 1000000) -> Optional[
 
             print(board)
             print(queens)
-            visualize_regions_queens(board, queens)
+            # visualize_regions_queens(board, queens)
             return board, attempt_num, attempt_time
         else:
             pass
@@ -778,7 +919,7 @@ if __name__ == "__main__":
     times = []
     num_attempts = []
 
-    num_trials = 1
+    num_trials = 10
     for i in range(num_trials):
         print(i)
         board, attempt_num, attempt_time = find_unique_solution_board(n)
