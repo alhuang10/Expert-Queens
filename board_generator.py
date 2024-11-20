@@ -129,10 +129,12 @@ def generate_random_queens(n: int = 8) -> List[Tuple[int, int]]:
             return result
 
 
-def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Optional[np.ndarray]:
+def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8
+                            ) -> Optional[np.ndarray]:
     """
     Generate non-compact, jagged regions to increase likelihood of unique solutions.
-    Returns an nxn numpy array where each cell contains a number 0 to n-1 representing its region.
+    Returns an nxn numpy array where each cell contains a number 0 to n-1 representing 
+    its region.
 
     Maintains invariant that the coloring state has a unique solution. If there is no
     possible next color assignment then it will return None
@@ -245,7 +247,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
                          if board[i, j] == -1)
     
     # Using symmetry test to mark disallowed colors
-    square_to_disallowed_color_mapping = defaultdict(list)  # (row, col) -> list(int)
+    square_to_disallowed_colors = defaultdict(list)  # (row, col) -> list(int)
 
     while uncolored_cells:
         # Find all uncolored cells adjacent to colored regions
@@ -257,7 +259,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
             # For each adjacent color, calculate spindly score
             for color in adj_colors:
                 score = get_spindly_score(row, col, color, queens, 
-                                          square_to_disallowed_color_mapping)
+                                          square_to_disallowed_colors)
                 candidates.append((score, (row, col, color)))
         
         assert len(candidates) != 0
@@ -282,7 +284,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
             selected_score = scores[selected_idx]
             
             # If the color at that position is banned, reject it
-            if color in square_to_disallowed_color_mapping[(proposed_row, proposed_col)]:
+            if color in square_to_disallowed_colors[(proposed_row, proposed_col)]:
                 candidates.remove((selected_score, (proposed_row, proposed_col, color)))
                 continue
 
@@ -309,12 +311,12 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
 
                 if queen_of_proposed_color_loc[0] == proposed_row:
                     # Conflicting queen is the queen in the proposed column
-                    conflicting_queen_loc = next(q for q in queens if q[1] == proposed_col)
+                    conflict_queen_loc = next(q for q in queens if q[1] == proposed_col)
 
                     potential_proposed_color_queen_loc = (proposed_row,
                                                           proposed_col)
                     # Square conflict queen would move to mirroring proposed color queen
-                    potential_conflicting_queen_loc = (conflicting_queen_loc[0],
+                    potential_conflicting_queen_loc = (conflict_queen_loc[0],
                                                        queen_of_proposed_color_loc[1])
                     
                     # Only do this check if the conflicting potential square uncolored
@@ -322,7 +324,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
                         # ignore the swapping queens
                         queens_to_check = [q for q in queens
                                            if q != queen_of_proposed_color_loc
-                                           if q != conflicting_queen_loc]
+                                           if q != conflict_queen_loc]
                         
                         symmetry_swap_constrained = is_symmetry_swap_constrained(
                             potential_proposed_color_queen_loc,
@@ -330,34 +332,36 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
                             queens_to_check
                         )
                         if not symmetry_swap_constrained:
-                            conflicting_queen_color = int(board[conflicting_queen_loc])
-                            square_to_disallowed_color_mapping[potential_conflicting_queen_loc].append(
-                                conflicting_queen_color)
+                            conflicting_queen_color = int(board[conflict_queen_loc])
+                            square_to_disallowed_colors[
+                                potential_conflicting_queen_loc
+                            ].append( conflicting_queen_color)
 
                 elif queen_of_proposed_color_loc[1] == proposed_col:
                     # Conflicting queen is the queen in the proposed row
-                    conflicting_queen_loc = next(q for q in queens if q[0] == proposed_row)
+                    conflict_queen_loc = next(q for q in queens if q[0] == proposed_row)
 
                     potential_proposed_color_queen_loc = (proposed_row,
                                                           proposed_col)
                     # Square conflict queen would move to mirroring proposed color queen
                     potential_conflicting_queen_loc = (queen_of_proposed_color_loc[0],
-                                                       conflicting_queen_loc[1])
+                                                       conflict_queen_loc[1])
                     # Only do this check if the conflicting potential square uncolored
                     if board[potential_conflicting_queen_loc] == -1:
                         # ignore the swapping queens
                         queens_to_check = [q for q in queens
                                           if q != queen_of_proposed_color_loc
-                                          if q != conflicting_queen_loc]
+                                          if q != conflict_queen_loc]
                         symmetry_swap_constrained = is_symmetry_swap_constrained(
                             potential_proposed_color_queen_loc,
                             potential_conflicting_queen_loc,
                             queens_to_check
                         )
                         if not symmetry_swap_constrained:
-                            conflicting_queen_color = int(board[conflicting_queen_loc])
-                            square_to_disallowed_color_mapping[potential_conflicting_queen_loc].append(
-                                conflicting_queen_color)
+                            conflicting_queen_color = int(board[conflict_queen_loc])
+                            square_to_disallowed_colors[
+                                potential_conflicting_queen_loc
+                            ].append(conflicting_queen_color)
 
             else:
                 # Found multiple solutions, undo color and remove from candidates
@@ -367,7 +371,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
     return board
 
 
-def find_unique_solution_board(n: int, max_attempts: int = 1000000) -> Optional[np.ndarray]:
+def find_unique_solution_board(n: int, max_attempts: int = 100) -> Optional[np.ndarray]:
     """
     Optimized version of board finder.
     """
@@ -393,10 +397,7 @@ def find_unique_solution_board(n: int, max_attempts: int = 1000000) -> Optional[
     return None
 
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description='Generate puzzle boards with unique queen solutions')
-    
-    # Add arguments
+    parser = argparse.ArgumentParser()
     parser.add_argument('--size', '-n', 
                        type=int, 
                        default=8,
