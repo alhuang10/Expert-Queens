@@ -139,25 +139,31 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8
     Maintains invariant that the coloring state has a unique solution. If there is no
     possible next color assignment then it will return None
     """
+    # Pre-compute and cache adjacent cells
+    adjacent_cells_cache = {}
+    adjacent_cells_diag_cache = {}
+    
     def get_adjacent_cells(row: int, col: int) -> List[Tuple[int, int]]:
-        """Get orthogonally adjacent cells"""
-        adjacent = []
-        for dr, dc in [(-1,0), (1,0), (0,-1), (0,1)]:
-            new_row, new_col = row + dr, col + dc
-            if 0 <= new_row < n and 0 <= new_col < n:
-                adjacent.append((new_row, new_col))
-        return adjacent
+        if (row, col) not in adjacent_cells_cache:
+            adjacent = []
+            for dr, dc in [(-1,0), (1,0), (0,-1), (0,1)]:
+                new_row, new_col = row + dr, col + dc
+                if 0 <= new_row < n and 0 <= new_col < n:
+                    adjacent.append((new_row, new_col))
+            adjacent_cells_cache[(row, col)] = adjacent
+        return adjacent_cells_cache[(row, col)]
     
     def get_adjacent_cells_diag(row: int, col: int) -> List[Tuple[int, int]]:
-        """Get all adjacent cells including diagonals"""
-        adjacent = []
-        for dr in [-1, 0, 1]:
-            for dc in [-1, 0, 1]:
-                if dr != 0 or dc != 0:
-                    new_row, new_col = row + dr, col + dc
-                    if 0 <= new_row < n and 0 <= new_col < n:
-                        adjacent.append((new_row, new_col))
-        return adjacent
+        if (row, col) not in adjacent_cells_diag_cache:
+            adjacent = []
+            for dr in [-1, 0, 1]:
+                for dc in [-1, 0, 1]:
+                    if dr != 0 or dc != 0:
+                        new_row, new_col = row + dr, col + dc
+                        if 0 <= new_row < n and 0 <= new_col < n:
+                            adjacent.append((new_row, new_col))
+            adjacent_cells_diag_cache[(row, col)] = adjacent
+        return adjacent_cells_diag_cache[(row, col)]
     
     def softmax(scores: List[float], temperature: float = 1.0) -> List[float]:
         """
