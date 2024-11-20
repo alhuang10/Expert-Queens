@@ -250,44 +250,43 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
             # Probabilistically sample from candidates
             scores = [score for score, _ in candidates]
             positions = [(r, c, color) for _, (r, c, color) in candidates]
-            probabilities = softmax([x+2 for x in scores], temperature=0.2)
+            # TODO: test temperature hyperparam effect on generation time
+            probabilities = softmax([x for x in scores], temperature=0.2)
             selected_idx = np.random.choice(len(positions), p=probabilities)
-            row, col, color = positions[selected_idx]
+            proposed_row, proposed_col, color = positions[selected_idx]
             selected_score = scores[selected_idx]
             
             # If the color at that position is banned, reject it
-            if color in square_to_disallowed_color_mapping[(row, col)]:
-                candidates.remove((selected_score, (row, col, color)))
+            if color in square_to_disallowed_color_mapping[(proposed_row, proposed_col)]:
+                candidates.remove((selected_score, (proposed_row, proposed_col, color)))
                 continue
 
             # Test if the resulting board is single solution
-            board[row, col] = color
+            board[proposed_row, proposed_col] = color
             solutions = find_up_to_two_solutions(board)
 
             if len(solutions) == 1:
                 # If so, mark next_color_found as True and visualize
                 next_color_found = True
-                uncolored_cells.remove((row, col))
+                uncolored_cells.remove((proposed_row, proposed_col))
 
-                # visualize_regions_queens(board, queens)
-
-                # Here we can do the symmetry check for when the color is on the
-                #   same row or column as the original queen
+                # Here we can do the symmetry check for when the proposed color is on 
+                #   the same row or column as the original queen
                 queen_loc_of_color = color_to_queen_loc[color]
 
-                if queen_loc_of_color[0] == row:
+                if queen_loc_of_color[0] == proposed_row:
                     # Use the column to find the queen of that column
                     conflicting_queen_loc = None
 
                     for queen_loc in queens:
-                        if queen_loc[1] == col:
+                        if queen_loc[1] == proposed_col:
                             conflicting_queen_loc = queen_loc
                             break
 
                     assert conflicting_queen_loc is not None  # TODO: remove
 
-                    new_potential_current_queen_loc = (row,
-                                                        col)
+                    new_potential_current_queen_loc = (proposed_row,
+                                                        proposed_col)
                     # Conflicting potential is current queen col, same row
                     new_potential_conflicting_queen_loc = (conflicting_queen_loc[0],
                                                             queen_loc_of_color[1])
@@ -325,19 +324,19 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
                                 int(board[conflicting_queen_loc]))
                             # print(f"No neighbor conflicts found, need to mark illegal color of {board[conflicting_queen_loc]}")                        
 
-                elif queen_loc_of_color[1] == col:
+                elif queen_loc_of_color[1] == proposed_col:
                     # Use the row to find the queen of that row
                     conflicting_queen_loc = None
 
                     for queen_loc in queens:
-                        if queen_loc[0] == row:
+                        if queen_loc[0] == proposed_row:
                             conflicting_queen_loc = queen_loc
                             break
 
                     assert conflicting_queen_loc is not None  # TODO: remove
                     # Current potential is where we will place new color
-                    new_potential_current_queen_loc = (row,
-                                                        col)
+                    new_potential_current_queen_loc = (proposed_row,
+                                                        proposed_col)
                     # Conflicting potential is current queen row, same col
                     new_potential_conflicting_queen_loc = (queen_loc_of_color[0],
                                                             conflicting_queen_loc[1])
@@ -376,8 +375,8 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8) -> Option
 
             else:
                 # Found multiple solutions, undo color and remove from candidates
-                board[row, col] = -1
-                candidates.remove((selected_score, (row, col, color)))
+                board[proposed_row, proposed_col] = -1
+                candidates.remove((selected_score, (proposed_row, proposed_col, color)))
     
     return board
 
