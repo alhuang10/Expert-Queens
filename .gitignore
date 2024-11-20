@@ -1,2 +1,4 @@
 queens/
 *.pyc
+*.npy
+*.pkl
