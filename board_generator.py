@@ -5,8 +5,12 @@ import time
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+import multiprocessing as mp
+
 from typing import List, Set, Tuple, Optional, Dict
 from collections import defaultdict
+from glob import glob
+from functools import partial
 
 from get_solutions import find_up_to_two_solutions_optimized
 
@@ -278,7 +282,7 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8
             if not candidates:
                 # print(repr(board))
                 # visualize_regions_queens(board, queens)
-                print("Reached a dead end board coloring, restarting!")
+                # print("Reached a dead end board coloring, restarting!")
                 return None
         
             # Probabilistically sample from candidates
@@ -378,7 +382,8 @@ def generate_regions_jagged(queens: List[Tuple[int, int]], n: int = 8
     return board
 
 
-def find_unique_solution_board(n: int, max_attempts: int = 100) -> Optional[np.ndarray]:
+def find_unique_solution_board(n: int, max_attempts: int = 1000000,
+                               verbose = False) -> Optional[np.ndarray]:
     """
     Optimized version of board finder.
     """
@@ -388,20 +393,47 @@ def find_unique_solution_board(n: int, max_attempts: int = 100) -> Optional[np.n
         queens = generate_random_queens(n)
         board = generate_regions_jagged(queens, n)
 
-        if (attempt_num+1) % 10 == 0:
-            elapsed = time.time() - start_time
-            boards_per_sec = attempt_num / elapsed if elapsed > 0 else 0
-            print(f"Attempt {attempt_num}, {boards_per_sec:.1f} boards/sec")            
+        if verbose:
+            if (attempt_num+1) % 10 == 0:
+                elapsed = time.time() - start_time
+                boards_per_sec = attempt_num / elapsed if elapsed > 0 else 0
+                print(f"Attempt {attempt_num}, {boards_per_sec:.1f} boards/sec")            
 
         if board is not None:
-            print(f"Found unique solution board after {attempt_num} attempts")
-            attempt_time = time.time() - start_time
-            print(f"Took {attempt_time:.2f} seconds")
-            print(repr(board))
-            print(queens)
+            if verbose:
+                print(f"Found unique solution board after {attempt_num} attempts")
+                attempt_time = time.time() - start_time
+                print(f"Took {attempt_time:.2f} seconds")
+                print(repr(board))
+                print(queens)
             return board, queens
 
     return None
+
+def find_unique_solution_board_parallel(n: int, process_id: int = 0) -> Optional[Tuple[np.ndarray, List[Tuple[int, int]]]]:
+    """Single process version of board finding for parallel execution"""
+    while True:
+        queens = generate_random_queens(n)
+        board = generate_regions_jagged(queens, n)
+        
+        if board is not None:
+            print(f"Process {process_id} found a solution!")
+            return board, queens
+    
+def generate_boards_parallel(n: int, num_processes: int, num_boards: int) -> List[Tuple[np.ndarray, List[Tuple[int, int]]]]:
+    """Generate multiple boards in parallel"""
+    with mp.Pool(processes=num_processes) as pool:
+        # Create partial function with fixed n
+        worker_func = partial(find_unique_solution_board_parallel, n)
+        
+        # Generate process IDs
+        process_ids = range(num_boards)
+        
+        # Run processes in parallel
+        results = pool.map(worker_func, process_ids)
+        
+        return [r for r in results if r is not None]
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -420,23 +452,63 @@ if __name__ == "__main__":
     parser.add_argument('--visualize_boards',
                         action="store_true",
                         help="Set flag to visualize finished board each iteration")
+    parser.add_argument('--num_processes', type=int, default=1)
+
     args = parser.parse_args()
 
     n = args.size
     output_folder = args.output_folder
     num_generations = args.num_generations
     visualize_boards = args.visualize_boards
+    num_processes = args.num_processes
 
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    for i in range(num_generations):
-        print(f"Generation Number {i}")
-        board, queens = find_unique_solution_board(n)
+    existing_boards = glob(f"{output_folder}/board_num_*.pkl")
+    max_board_number = -1
 
-        game_data = {"board": board, "queens": queens}
-        with open(os.path.join(output_folder, f'board_num_{i}.pkl'), 'wb') as f:
-            pickle.dump(game_data, f)
+    for b in existing_boards:
+        board_num = int(b.split("_")[-1].split('.')[0])
+        if board_num > max_board_number:
+            max_board_number = board_num
 
-        if visualize_boards:
-            visualize_regions_queens(board, queens)
+    starting_num = max_board_number + 1
+    ending_num = starting_num + num_generations
+    print(f"Generating {num_generations} boards from index {starting_num}")
+
+    if num_processes > 1:
+        start_time = time.time()
+
+        print(f"Using {num_processes} cores to generate boards")
+        boards = generate_boards_parallel(n, num_processes, num_generations)
+        
+        save_num = starting_num
+
+        for board, queens in boards:
+            game_data = {"board": board, "queens": queens}
+            with open(os.path.join(output_folder, f'board_num_{save_num}.pkl'), 'wb') as f:
+                pickle.dump(game_data, f)
+            
+            save_num += 1
+        print(f"Generated {len(boards)} unique solution boards")
+        elapsed_time = time.time() - start_time
+        print(f"Sec/board for {len(board)} boards: {elapsed_time / len(boards)}")
+    else:
+        print(f"Generating boards serially")
+        start_time = time.time()
+
+        for i in range(starting_num, ending_num):
+            print(i)
+            if (i + 1) % 10 == 0:
+                elapsed_time = time.time() - start_time
+                print(f"Average sec per board {round(elapsed_time / (i - starting_num), 2)}")
+
+            board, queens = find_unique_solution_board(n)
+
+            game_data = {"board": board, "queens": queens}
+            with open(os.path.join(output_folder, f'board_num_{i}.pkl'), 'wb') as f:
+                pickle.dump(game_data, f)
+
+            if visualize_boards:
+                visualize_regions_queens(board, queens)
