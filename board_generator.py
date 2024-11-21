@@ -493,7 +493,7 @@ if __name__ == "__main__":
             save_num += 1
         print(f"Generated {len(boards)} unique solution boards")
         elapsed_time = time.time() - start_time
-        print(f"Sec/board for {len(board)} boards: {elapsed_time / len(boards)}")
+        print(f"Sec/board for {len(boards)} boards: {elapsed_time / len(boards)}")
     else:
         print(f"Generating boards serially")
         start_time = time.time()
