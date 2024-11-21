@@ -211,10 +211,25 @@
                     this.checkVictory();
                 },
                 async loadState() {
-                    const response = await fetch('/api/state');
+                    // Check URL parameters
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const size = urlParams.get('size');
+                    const gameNumber = urlParams.get('game');
+                    
+                    let response;
+                    if (size && gameNumber !== null) {
+                        // Load specific pre-generated game
+                        response = await fetch(`/api/select_game/${size}/${gameNumber}`);
+                    } else {
+                        // Load current game state
+                        response = await fetch('/api/state');
+                    }
+                    
                     if (response.ok) {
                         this.state = await response.json();
                     } else {
+                        // Handle error - redirect to home or show error message
+                        console.error('Failed to load game');
                         window.location.href = '/';
                     }
                 },
@@ -237,10 +252,19 @@
                     this.showVictoryModal = false;
                 },
                 async startNewGame() {
-                    const response = await fetch(`/api/new_game/${this.state.size}`);
-                    if (response.ok) {
-                        this.showVictoryModal = false;
-                        this.state = await response.json();
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const size = urlParams.get('size');
+                    
+                    if (size >= 12) {
+                        // For larger boards, go back to selection page
+                        window.location.href = `/select_game/${size}`;
+                    } else {
+                        // For smaller boards, generate new game
+                        const response = await fetch(`/api/new_game/${this.state.size}`);
+                        if (response.ok) {
+                            this.showVictoryModal = false;
+                            this.state = await response.json();
+                        }
                     }
                 },
                 backToMenu() {

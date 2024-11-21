@@ -49,6 +49,12 @@
         button:hover {
             background-color: #45a049;
         }
+
+        .size-info {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -62,6 +68,9 @@
                         {{ size }}x{{ size }}
                     </option>
                 </select>
+                <div class="size-info" v-if="selectedSize >= 12">
+                    For {{ selectedSize }}x{{ selectedSize }} boards, you'll select from pre-generated puzzles
+                </div>
             </div>
             <button @click="startGame">Start Game</button>
         </div>
@@ -79,9 +88,15 @@
             },
             methods: {
                 async startGame() {
-                    const response = await fetch(`/api/new_game/${this.selectedSize}`);
-                    if (response.ok) {
-                        window.location.href = '/game';
+                    if (this.selectedSize >= 12) {
+                        // For larger boards, go to selection page
+                        window.location.href = `/select_game/${this.selectedSize}`;
+                    } else {
+                        // For smaller boards, generate directly
+                        const response = await fetch(`/api/new_game/${this.selectedSize}`);
+                        if (response.ok) {
+                            window.location.href = '/game';
+                        }
                     }
                 }
             }
