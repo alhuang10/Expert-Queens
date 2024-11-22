@@ -500,6 +500,22 @@
                     if (regionQueens.every(count => count === 1)) {
                         this.stopTimer();
                         this.showVictoryModal = true;
+                        
+                        // Mark puzzle as completed if it's a pre-generated puzzle
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const size = parseInt(urlParams.get('size'));
+                        const gameNumber = parseInt(urlParams.get('game')) + 1;
+                        
+                        if (size >= 12) {  // Only mark pre-generated puzzles as complete
+                            const completed = JSON.parse(localStorage.getItem('completedPuzzles') || '{}');
+                            if (!completed[size]) {
+                                completed[size] = [];
+                            }
+                            if (!completed[size].includes(gameNumber)) {
+                                completed[size].push(gameNumber);
+                                localStorage.setItem('completedPuzzles', JSON.stringify(completed));
+                            }
+                        }
                     }
                 },
                 hideModal() {

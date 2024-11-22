@@ -67,6 +67,12 @@
                 0 6px 6px rgba(0,0,0,0.1);
         }
 
+        /* New styles for completed state */
+        .game-button.completed {
+            background: linear-gradient(145deg, #4CAF50, #43A047);
+            color: white;
+        }
+
         .game-button:active {
             transform: translateY(-1px);
             box-shadow: 
@@ -100,6 +106,16 @@
             box-shadow: 0 6px 8px rgba(0,0,0,0.15);
         }
 
+        /* Completion checkmark */
+        .completion-check {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            color: white;
+            font-weight: bold;
+        }
+
+
         /* Make sure the page looks good on mobile */
         @media (max-width: 900px) {
             .game-grid {
@@ -121,6 +137,7 @@
                 font-size: 16px;
             }
         }
+        
     </style>
 </head>
 <body>
@@ -136,62 +153,66 @@
     </div>
 
     <script>
-        // Get size from URL
+        // Get board size from URL
         const pathParts = window.location.pathname.split('/');
-        const size = pathParts[pathParts.length - 1];
-        
-        // Update the displayed size
+        const size = parseInt(pathParts[pathParts.length - 1]);
         document.getElementById('boardSize').textContent = `${size}x${size}`;
-        
-        // Fetch available games
+
+        // Function to check if a game is completed
+        function isGameCompleted(gameNum) {
+            const completed = JSON.parse(localStorage.getItem('completedPuzzles') || '{}');
+            return completed[size]?.includes(gameNum);
+        }
+
+        // Function to handle game selection
+        function selectGame(gameNum) {
+            sessionStorage.setItem('selectedGame', JSON.stringify({
+                size: size,
+                gameNumber: gameNum
+            }));
+            window.location.href = `/game?size=${size}&game=${gameNum-1}`;
+        }
+
+        // Fetch and create game buttons
         fetch(`/api/available_games/${size}`, {
             credentials: 'include'
         })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                const grid = document.getElementById('gameGrid');
-                const loading = document.getElementById('loading');
+        .then(response => response.json())
+        .then(data => {
+            const grid = document.getElementById('gameGrid');
+            const loading = document.getElementById('loading');
+            
+            if (data.games.length === 0) {
+                loading.textContent = 'No games available for this size.';
+                return;
+            }
+
+            data.games.forEach(gameNum => {
+                const button = document.createElement('button');
+                button.className = 'game-button' + (isGameCompleted(gameNum) ? ' completed' : '');
+                button.onclick = () => selectGame(gameNum);
                 
-                if (data.games.length === 0) {
-                    loading.textContent = 'No games available for this size.';
-                    return;
+                button.textContent = `Game ${gameNum}`;
+                
+                if (isGameCompleted(gameNum)) {
+                    const check = document.createElement('span');
+                    check.className = 'completion-check';
+                    check.textContent = '✓';
+                    button.appendChild(check);
                 }
-
-                // Create buttons for each available game number
-                data.games.forEach(gameNum => {
-                    const button = document.createElement('button');
-                    button.className = 'game-button';
-                    button.textContent = `Game ${gameNum}`;
-                    
-                    // Game index is gameNum-1 for the API
-                    button.onclick = () => {
-                        // Store selected game info in session storage
-                        sessionStorage.setItem('selectedGame', JSON.stringify({
-                            size: size,
-                            gameNumber: gameNum
-                        }));
-                        // Redirect to game page
-                        window.location.href = `/game?size=${size}&game=${gameNum-1}`;
-                    };
-                    
-                    grid.appendChild(button);
-                });
-
-                // Hide loading and show grid
-                loading.style.display = 'none';
-                grid.style.display = 'grid';
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                const loading = document.getElementById('loading');
-                loading.textContent = 'Error loading games. Please try again later.';
-                loading.style.color = 'red';
+                
+                grid.appendChild(button);
             });
+
+            loading.style.display = 'none';
+            grid.style.display = 'grid';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            const loading = document.getElementById('loading');
+            loading.textContent = 'Error loading games. Please try again later.';
+            loading.style.color = 'red';
+        });
     </script>
 </body>
 </html>
