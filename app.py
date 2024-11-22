@@ -47,6 +47,11 @@ class GameState:
         self.marks[row, col] = (self.marks[row, col] + 1) % 3
         return self.marks[row, col]
 
+    def reset_marks(self):
+        """Reset all marks while preserving the board layout"""
+        if self.marks is not None:
+            self.marks = np.zeros((self.n, self.n), dtype=int)
+
 
 class GameStateManager:
     def __init__(self):
@@ -110,7 +115,16 @@ class GameStateManager:
             print(f"Error loading game: {str(e)}")
             return None
 
-
+    def reset_current_game(self) -> Optional[GameState]:
+        """Reset the current game's marks while preserving the board layout"""
+        game = self.get_game_state()
+        if game is None:
+            return None
+            
+        game.reset_marks()
+        self.save_game_state(game)
+        return game
+    
 # Initialize the game state manager
 game_manager = GameStateManager()
 
@@ -190,6 +204,14 @@ def get_available_games(size):
         'size': size,
         'games': game_numbers
     })
+
+@app.route('/api/reset', methods=['POST'])
+def reset_game():
+    game = game_manager.reset_current_game()
+    if game is None:
+        return jsonify({'error': 'No game started'}), 400
+        
+    return jsonify(game.to_dict())
 
 @app.route('/static/<path:path>')
 def send_static(path):

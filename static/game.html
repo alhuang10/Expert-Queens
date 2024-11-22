@@ -131,6 +131,7 @@
     <div id="app">
         <div class="controls">
             <button @click="startNewGame">New Game</button>
+            <button @click="resetGame" class="reset">Reset Current Game</button>
             <button @click="backToMenu">Back to Menu</button>
         </div>
         <div class="board" 
@@ -186,16 +187,16 @@
                         '#0000FF', // Blue
                         '#FFD700', // Gold
                         '#FF00FF', // Magenta
-                        '#00FFFF', // Cyan
-                        '#FF8C00', // Dark Orange
+                        '#AFEEEE', // Cyan
+                        '#FFBF00', // Amber
                         '#8B4513', // Saddle Brown
-                        '#98FF98', // Mint Green
-                        '#32CD32', // Lime Green
-                        '#FF69B4', // Hot Pink
-                        '#8A2BE2', // Blue Violet
-                        '#00CED1', // Dark Turquoise
+                        '#1E90FF', // Dodger Blue
+                        '#3CB371', // Medium Sea Green
+                        '#FF1493', // Deep Pink
+                        '#4B0082', // Indigo
+                        '#87CEEB', // Sky Blue
                         '#FF4500', // Orange Red
-                        '#2E8B57'  // Sea Green
+                        '#556B2F'  // Dark Olive Green
                     ],
                     isDragging: false,
                     mouseDownCell: null,
@@ -297,6 +298,18 @@
                     const data = await response.json();
                     this.state.marks[row][col] = data.mark;
                     this.checkVictory();
+                },
+                async resetGame() {
+                    const response = await fetch('/api/reset', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                    if (response.ok) {
+                        // Reset all marks to 0 while keeping the regions
+                        this.state.marks = Array(this.state.size).fill().map(() => 
+                            Array(this.state.size).fill(0)
+                        );
+                    }
                 },
                 async loadState() {
                     // Check URL parameters
