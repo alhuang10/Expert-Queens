@@ -31,6 +31,9 @@
             font-size: 24px;
             cursor: pointer;
             user-select: none;
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* IE10+/Edge */
         }
         
         .cell:hover {
@@ -130,13 +133,19 @@
             <button @click="startNewGame">New Game</button>
             <button @click="backToMenu">Back to Menu</button>
         </div>
-        <div class="board" :style="boardStyle">
+        <div class="board" 
+             :style="boardStyle"
+             @mouseup="handleMouseUp"
+             @mouseleave="handleMouseLeave">
             <template v-for="(row, i) in state.regions">
                 <div v-for="(cell, j) in row" 
                      :key="`${i}-${j}`"
                      class="cell"
+                     :class="{ 'dragging': isDragging }"
                      :style="getCellStyle(i, j)"
-                     @click="toggleMark(i, j)">
+                     @mousedown="handleMouseDown($event, i, j)"
+                     @mouseenter="handleMouseEnter(i, j)"
+                     @mouseup.stop="handleCellMouseUp(i, j)">
                     <span v-if="state.marks[i][j] === 1" class="mark-x">X</span>
                     <img v-if="state.marks[i][j] === 2" 
                          src="/static/black_queen_logo.png" 
@@ -145,7 +154,6 @@
                 </div>
             </template>
         </div>
-
         <!-- Victory Modal -->
         <div v-if="showVictoryModal" class="modal-overlay" @click="hideModal">
             <div class="modal" @click.stop>
@@ -188,7 +196,12 @@
                         '#00CED1', // Dark Turquoise
                         '#FF4500', // Orange Red
                         '#2E8B57'  // Sea Green
-                    ]
+                    ],
+                    isDragging: false,
+                    mouseDownCell: null,
+                    lastCell: null,
+                    hasMoved: false,
+                    initialMarkState: null, // Store the initial state of the cell when mouse goes down
                 }
             },
             computed: {
@@ -199,17 +212,90 @@
                 }
             },
             methods: {
+                handleMouseDown(event, row, col) {
+                    // Store the cell where mousedown occurred and its initial state
+                    this.mouseDownCell = { row, col };
+                    this.initialMarkState = this.state.marks[row][col];
+                    this.hasMoved = false;
+                    
+                    // If it's an empty cell, mark it with X immediately
+                    if (this.state.marks[row][col] === 0) {
+                        this.toggleMarkX(row, col);
+                    }
+                    
+                    // Prevent default to avoid text selection
+                    event.preventDefault();
+                },
+
+                handleMouseUp() {
+                    // Reset all tracking variables
+                    this.isDragging = false;
+                    this.lastCell = null;
+                    this.mouseDownCell = null;
+                    this.hasMoved = false;
+                },
+
+                handleMouseLeave() {
+                    this.isDragging = false;
+                    this.lastCell = null;
+                    this.mouseDownCell = null;
+                    this.hasMoved = false;
+                },
+
+                handleCellMouseUp(row, col) {
+                    // Only process as a click if:
+                    // 1. We haven't moved AND
+                    // 2. We're on the same cell we started on AND
+                    // 3. The initial state was either empty (0) or X (1)
+                    if (!this.hasMoved && 
+                        this.mouseDownCell && 
+                        this.mouseDownCell.row === row && 
+                        this.mouseDownCell.col === col &&
+                        this.initialMarkState !== 0) { // Don't process if we started on an empty cell
+                        this.toggleMark(row, col);
+                    }
+                    
+                    this.handleMouseUp();
+                },
+
+                handleMouseEnter(row, col) {
+                    if (this.mouseDownCell) {
+                        // If we enter a new cell while holding mouse button,
+                        // we've officially started dragging
+                        this.hasMoved = true;
+                        this.isDragging = true;
+                        
+                        // Mark X if it's an empty cell
+                        if (this.state.marks[row][col] === 0) {
+                            this.toggleMarkX(row, col);
+                        }
+                        
+                        this.lastCell = `${row}-${col}`;
+                    }
+                },
+
                 getCellStyle(i, j) {
                     return {
                         backgroundColor: this.colors[this.state.regions[i][j]]
                     }
                 },
-                async toggleMark(i, j) {
-                    const response = await fetch(`/api/toggle/${i}/${j}`, {
+
+                async toggleMarkX(row, col) {
+                    if (this.state.marks[row][col] === 0) {
+                        const response = await fetch(`/api/toggle/${row}/${col}`, {
+                            credentials: 'include'
+                        });
+                        const data = await response.json();
+                        this.state.marks[row][col] = data.mark;
+                    }
+                },
+
+                async toggleMark(row, col) {
+                    const response = await fetch(`/api/toggle/${row}/${col}`, {
                         credentials: 'include'
-                    });                    
+                    });
                     const data = await response.json();
-                    this.state.marks[i][j] = data.mark;
+                    this.state.marks[row][col] = data.mark;
                     this.checkVictory();
                 },
                 async loadState() {
