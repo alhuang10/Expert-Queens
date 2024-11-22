@@ -205,7 +205,9 @@
                     }
                 },
                 async toggleMark(i, j) {
-                    const response = await fetch(`/api/toggle/${i}/${j}`);
+                    const response = await fetch(`/api/toggle/${i}/${j}`, {
+                        credentials: 'include'
+                    });                    
                     const data = await response.json();
                     this.state.marks[i][j] = data.mark;
                     this.checkVictory();
@@ -219,16 +221,19 @@
                     let response;
                     if (size && gameNumber !== null) {
                         // Load specific pre-generated game
-                        response = await fetch(`/api/select_game/${size}/${gameNumber}`);
+                        response = await fetch(`/api/select_game/${size}/${gameNumber}`, {
+                            credentials: 'include'
+                        });
                     } else {
                         // Load current game state
-                        response = await fetch('/api/state');
+                        response = await fetch('/api/state', {
+                            credentials: 'include'
+                        });
                     }
                     
                     if (response.ok) {
                         this.state = await response.json();
                     } else {
-                        // Handle error - redirect to home or show error message
                         console.error('Failed to load game');
                         window.location.href = '/';
                     }
@@ -256,11 +261,11 @@
                     const size = urlParams.get('size');
                     
                     if (size >= 12) {
-                        // For larger boards, go back to selection page
                         window.location.href = `/select_game/${size}`;
                     } else {
-                        // For smaller boards, generate new game
-                        const response = await fetch(`/api/new_game/${this.state.size}`);
+                        const response = await fetch(`/api/new_game/${this.state.size}`, {
+                            credentials: 'include'
+                        });
                         if (response.ok) {
                             this.showVictoryModal = false;
                             this.state = await response.json();

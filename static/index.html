@@ -89,11 +89,11 @@
             methods: {
                 async startGame() {
                     if (this.selectedSize >= 12) {
-                        // For larger boards, go to selection page
                         window.location.href = `/select_game/${this.selectedSize}`;
                     } else {
-                        // For smaller boards, generate directly
-                        const response = await fetch(`/api/new_game/${this.selectedSize}`);
+                        const response = await fetch(`/api/new_game/${this.selectedSize}`, {
+                            credentials: 'include'
+                        });
                         if (response.ok) {
                             window.location.href = '/game';
                         }
