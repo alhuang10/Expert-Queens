@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Queen Puzzle Game</title>
+    <title>Hard Queens</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.min.js"></script>
     <style>
         body {
@@ -20,6 +20,8 @@
             padding: 2rem;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            width: 400px;  /* Fixed width */
+            max-width: 90vw;  /* Responsive fallback for mobile */
         }
         
         h1 {
@@ -33,6 +35,8 @@
             margin: 1rem;
             border-radius: 5px;
             border: 1px solid #ccc;
+            width: 120px;  /* Fixed width for the dropdown */
+            text-align: center;
         }
         
         button {
@@ -44,6 +48,7 @@
             border-radius: 5px;
             cursor: pointer;
             transition: background-color 0.3s;
+            margin-top: 0.5rem;
         }
         
         button:hover {
@@ -53,14 +58,20 @@
         .size-info {
             font-size: 0.9rem;
             color: #666;
-            margin-top: 0.5rem;
+            margin-top: 1.5rem;
+            margin-bottom: 1.5rem;
+            word-wrap: break-word;  /* Ensures text wraps */
+            white-space: normal;    /* Ensures text wraps */
+            max-width: 100%;        /* Constrains text to container width */
+            margin-left: auto;      /* Centers the text block */
+            margin-right: auto;
         }
     </style>
 </head>
 <body>
     <div id="app">
         <div class="container">
-            <h1>Queen Puzzle Game</h1>
+            <h1>Hard Queens</h1>
             <div>
                 <label for="board-size">Select Board Size:</label>
                 <select id="board-size" v-model="selectedSize">
@@ -68,11 +79,19 @@
                         {{ size }}x{{ size }}
                     </option>
                 </select>
+                <div class="size-info" v-if="selectedSize <= 11">
+                    For 11x11 and smaller boards, we will procedurally generate a new 
+                    board each time. There may be a slight delay while 
+                    we find a board with a unique solution.
+                </div>
                 <div class="size-info" v-if="selectedSize >= 12">
-                    For {{ selectedSize }}x{{ selectedSize }} boards, you'll select from pre-generated puzzles
+                    For 12x12 and bigger boards, we have a set of pre-generated puzzles 
+                    manually selected for high difficulty. Good luck!
                 </div>
             </div>
-            <button @click="startGame">Start Game</button>
+            <button @click="startGame">
+                {{ selectedSize >= 12 ? 'Choose Puzzle' : 'Generate Puzzle' }}
+            </button>
         </div>
     </div>
 
@@ -82,7 +101,7 @@
         const app = createApp({
             data() {
                 return {
-                    selectedSize: 8,
+                    selectedSize: 12,
                     sizes: Array.from({length: 10}, (_, i) => i + 6) // generates [6,7,8,...,15]
                 }
             },
