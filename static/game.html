@@ -14,12 +14,27 @@
             font-family: Arial, sans-serif;
         }
         
+        #app {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 1200px;
+            padding: 20px;
+        }
+        
+        .board-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        
         .board {
             display: inline-grid;
             gap: 1px;
             background: #333;
             padding: 1px;
-            margin: 20px;
+            margin: 20px auto;
         }
         
         .cell {
@@ -53,6 +68,23 @@
         .controls {
             text-align: center;
             margin-bottom: 1rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+        
+        .timer {
+            font-size: 1rem;
+            padding: 0.5rem 1rem;
+            margin: 0.5rem;
+            background-color: #2196F3;
+            color: white;
+            border-radius: 5px;
+            min-width: 100px;
+            text-align: center;
         }
         
         button {
@@ -130,6 +162,7 @@
 <body>
     <div id="app">
         <div class="controls">
+            <div class="timer">{{ formattedTime }}</div>
             <button @click="startNewGame">New Game</button>
             <button @click="resetGame" class="reset">Reset Current Game</button>
             <button @click="backToMenu">Back to Menu</button>
@@ -159,7 +192,7 @@
         <div v-if="showVictoryModal" class="modal-overlay" @click="hideModal">
             <div class="modal" @click.stop>
                 <h2>🎉 Congratulations! 🎉</h2>
-                <p>You've found all the queens!</p>
+                <p>You've found all the queens in {{ formattedTime }}!</p>
                 <div class="button-container">
                     <button @click="startNewGame">New Game</button>
                     <button @click="hideModal">Continue Viewing</button>
@@ -202,7 +235,10 @@
                     mouseDownCell: null,
                     lastCell: null,
                     hasMoved: false,
-                    initialMarkState: null, // Store the initial state of the cell when mouse goes down
+                    initialMarkState: null,
+                    startTime: null,
+                    elapsedTime: 0,
+                    timerInterval: null
                 }
             },
             computed: {
@@ -210,9 +246,41 @@
                     return {
                         'grid-template-columns': `repeat(${this.state.size}, 60px)`
                     }
+                },
+                formattedTime() {
+                    const totalSeconds = Math.floor(this.elapsedTime / 1000);
+                    const minutes = Math.floor(totalSeconds / 60);
+                    const seconds = totalSeconds % 60;
+                    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
                 }
             },
             methods: {
+                startTimer() {
+                    // Clear any existing timer
+                    if (this.timerInterval) {
+                        clearInterval(this.timerInterval);
+                    }
+                    
+                    // Reset and start timer
+                    this.startTime = Date.now() - this.elapsedTime;
+                    this.timerInterval = setInterval(() => {
+                        this.elapsedTime = Date.now() - this.startTime;
+                    }, 1000);
+                },
+
+                stopTimer() {
+                    if (this.timerInterval) {
+                        clearInterval(this.timerInterval);
+                        this.timerInterval = null;
+                    }
+                },
+
+                resetTimer() {
+                    this.stopTimer();
+                    this.elapsedTime = 0;
+                    this.startTimer();
+                },
+
                 handleMouseDown(event, row, col) {
                     // Store the cell where mousedown occurred and its initial state
                     this.mouseDownCell = { row, col };
@@ -305,26 +373,22 @@
                         credentials: 'include'
                     });
                     if (response.ok) {
-                        // Reset all marks to 0 while keeping the regions
                         this.state.marks = Array(this.state.size).fill().map(() => 
                             Array(this.state.size).fill(0)
                         );
                     }
                 },
                 async loadState() {
-                    // Check URL parameters
                     const urlParams = new URLSearchParams(window.location.search);
                     const size = urlParams.get('size');
                     const gameNumber = urlParams.get('game');
                     
                     let response;
                     if (size && gameNumber !== null) {
-                        // Load specific pre-generated game
                         response = await fetch(`/api/select_game/${size}/${gameNumber}`, {
                             credentials: 'include'
                         });
                     } else {
-                        // Load current game state
                         response = await fetch('/api/state', {
                             credentials: 'include'
                         });
@@ -332,23 +396,23 @@
                     
                     if (response.ok) {
                         this.state = await response.json();
+                        this.resetTimer();
                     } else {
                         console.error('Failed to load game');
                         window.location.href = '/';
                     }
                 },
                 checkVictory() {
-                    // Count queens in each region
                     const regionQueens = new Array(this.state.size).fill(0);
                     for (let i = 0; i < this.state.size; i++) {
                         for (let j = 0; j < this.state.size; j++) {
-                            if (this.state.marks[i][j] === 2) { // if queen
+                            if (this.state.marks[i][j] === 2) {
                                 regionQueens[this.state.regions[i][j]]++;
                             }
                         }
                     }
-                    // Check if each region has exactly one queen
                     if (regionQueens.every(count => count === 1)) {
+                        this.stopTimer();
                         this.showVictoryModal = true;
                     }
                 },
@@ -368,6 +432,7 @@
                         if (response.ok) {
                             this.showVictoryModal = false;
                             this.state = await response.json();
+                            this.resetTimer();
                         }
                     }
                 },
@@ -377,6 +442,9 @@
             },
             mounted() {
                 this.loadState();
+            },
+            beforeUnmount() {
+                this.stopTimer();
             }
         });
 
