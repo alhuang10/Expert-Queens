@@ -29,7 +29,7 @@
         }
         .game-grid {
             display: grid;
-            grid-template-columns: repeat(5, 1fr); /* Exactly 5 columns */
+            grid-template-columns: repeat(5, 1fr);
             gap: 20px;
             padding: 30px;
             background: white;
@@ -46,7 +46,6 @@
             background: linear-gradient(145deg, #ffffff, #f0f0f0);
             border: none;
             border-radius: 12px;
-            /* Changed from blue to a more neutral dark gray */
             color: #424242;
             transition: all 0.3s ease;
             box-shadow: 
@@ -55,10 +54,13 @@
             font-weight: 600;
             position: relative;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
         }
 
         .game-button:hover {
-            /* Changed hover gradient to a more pleasant green */
             background: linear-gradient(145deg, #4CAF50, #43A047);
             color: white;
             transform: translateY(-3px);
@@ -67,10 +69,27 @@
                 0 6px 6px rgba(0,0,0,0.1);
         }
 
-        /* New styles for completed state */
+        .game-button .game-number {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .game-button .completion-time {
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        .game-button:hover .completion-time {
+            color: #fff;
+        }
+
         .game-button.completed {
             background: linear-gradient(145deg, #4CAF50, #43A047);
             color: white;
+        }
+
+        .game-button.completed .completion-time {
+            color: rgba(255, 255, 255, 0.9);
         }
 
         .game-button:active {
@@ -106,17 +125,6 @@
             box-shadow: 0 6px 8px rgba(0,0,0,0.15);
         }
 
-        /* Completion checkmark */
-        .completion-check {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            color: white;
-            font-weight: bold;
-        }
-
-
-        /* Make sure the page looks good on mobile */
         @media (max-width: 900px) {
             .game-grid {
                 grid-template-columns: repeat(3, 1fr);
@@ -137,7 +145,6 @@
                 font-size: 16px;
             }
         }
-        
     </style>
 </head>
 <body>
@@ -158,10 +165,19 @@
         const size = parseInt(pathParts[pathParts.length - 1]);
         document.getElementById('boardSize').textContent = `${size}x${size}`;
 
-        // Function to check if a game is completed
-        function isGameCompleted(gameNum) {
-            const completed = JSON.parse(localStorage.getItem('completedPuzzles') || '{}');
-            return completed[size]?.includes(gameNum);
+        // Function to format time in MM:SS format
+        function formatTime(timeInMs) {
+            const totalSeconds = Math.floor(timeInMs / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // Function to get completion data for a game
+        function getCompletionData(size, gameNum) {
+            const completionData = JSON.parse(localStorage.getItem('puzzleCompletionData') || '{}');
+            if (!completionData[size]) return null;
+            return completionData[size][gameNum] || null;
         }
 
         // Function to handle game selection
@@ -189,16 +205,23 @@
 
             data.games.forEach(gameNum => {
                 const button = document.createElement('button');
-                button.className = 'game-button' + (isGameCompleted(gameNum) ? ' completed' : '');
+                button.className = 'game-button';
                 button.onclick = () => selectGame(gameNum);
                 
-                button.textContent = `Game ${gameNum}`;
+                // Create game number element
+                const gameNumberDiv = document.createElement('div');
+                gameNumberDiv.className = 'game-number';
+                gameNumberDiv.textContent = `Game ${gameNum}`;
+                button.appendChild(gameNumberDiv);
                 
-                if (isGameCompleted(gameNum)) {
-                    const check = document.createElement('span');
-                    check.className = 'completion-check';
-                    check.textContent = '✓';
-                    button.appendChild(check);
+                // Check completion data and add completion time if completed
+                const completionData = getCompletionData(size, gameNum);
+                if (completionData) {
+                    button.classList.add('completed');
+                    const timeDiv = document.createElement('div');
+                    timeDiv.className = 'completion-time';
+                    timeDiv.textContent = formatTime(completionData.timeMs);
+                    button.appendChild(timeDiv);
                 }
                 
                 grid.appendChild(button);

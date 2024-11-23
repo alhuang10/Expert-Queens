@@ -506,7 +506,26 @@
                         const size = parseInt(urlParams.get('size'));
                         const gameNumber = parseInt(urlParams.get('game')) + 1;
                         
-                        if (size >= 12) {  // Only mark pre-generated puzzles as complete
+                        if (size >= 12) {  // Only track pre-generated puzzles
+                            // Get existing completion data
+                            const completionData = JSON.parse(localStorage.getItem('puzzleCompletionData') || '{}');
+                            
+                            // Initialize size entry if it doesn't exist
+                            if (!completionData[size]) {
+                                completionData[size] = {};
+                            }
+                            
+                            // Store completion time if it's better than previous or first completion
+                            if (!completionData[size][gameNumber] || 
+                                completionData[size][gameNumber].timeMs > this.elapsedTime) {
+                                completionData[size][gameNumber] = {
+                                    timeMs: this.elapsedTime,
+                                    completedAt: Date.now()
+                                };
+                                localStorage.setItem('puzzleCompletionData', JSON.stringify(completionData));
+                            }
+                            
+                            // Also maintain the existing completion tracking
                             const completed = JSON.parse(localStorage.getItem('completedPuzzles') || '{}');
                             if (!completed[size]) {
                                 completed[size] = [];
