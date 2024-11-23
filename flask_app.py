@@ -20,7 +20,8 @@ class GameState:
         self.queens = None
         self.regions = None
         self.marks = None
-        
+        self.saved_marks = None
+
     def initialize_from_generator(self):
         self.regions, self.queens = find_unique_solution_board(self.n)
         print("regions:", self.regions)
@@ -35,14 +36,16 @@ class GameState:
         return {
             'regions': self.regions.tolist() if self.regions is not None else None,
             'marks': self.marks.tolist() if self.marks is not None else None,
-            'size': self.n
+            'size': self.n,
+            'saved_marks': self.saved_marks.tolist() if self.saved_marks is not None else None
         }
         
     def from_dict(self, data):
         self.n = data['size']
         self.regions = np.array(data['regions']) if data['regions'] is not None else None
         self.marks = np.array(data['marks']) if data['marks'] is not None else None
-        
+        self.saved_marks = np.array(data['saved_marks']) if data.get('saved_marks') is not None else None
+
     def toggle_mark(self, row, col):
         self.marks[row, col] = (self.marks[row, col] + 1) % 3
         return self.marks[row, col]
@@ -51,6 +54,21 @@ class GameState:
         """Reset all marks while preserving the board layout"""
         if self.marks is not None:
             self.marks = np.zeros((self.n, self.n), dtype=int)
+
+    def save_marks_state(self):
+        """Save current marks state"""
+        self.saved_marks = self.marks.copy() if self.marks is not None else None
+        
+    def revert_marks_state(self):
+        """Revert to saved marks state"""
+        if hasattr(self, 'saved_marks') and self.saved_marks is not None:
+            self.marks = self.saved_marks.copy()
+            return True
+        return False
+    
+    def has_saved_state(self):
+        """Check if there's a saved state"""
+        return hasattr(self, 'saved_marks') and self.saved_marks is not None
 
 
 class GameStateManager:
@@ -127,6 +145,28 @@ class GameStateManager:
     
 # Initialize the game state manager
 game_manager = GameStateManager()
+
+# Add these routes to the Flask app
+@app.route('/api/save_state', methods=['POST'])
+def save_state():
+    game = game_manager.get_game_state()
+    if game is None:
+        return jsonify({'error': 'No game started'}), 400
+        
+    game.save_marks_state()
+    game_manager.save_game_state(game)
+    return jsonify({'success': True})
+
+@app.route('/api/revert_state', methods=['POST'])
+def revert_state():
+    game = game_manager.get_game_state()
+    if game is None:
+        return jsonify({'error': 'No game started'}), 400
+        
+    if game.revert_marks_state():
+        game_manager.save_game_state(game)
+        return jsonify(game.to_dict())
+    return jsonify({'error': 'No saved state'}), 400
 
 @app.route('/api/select_game/<int:size>/<int:game_number>')
 def select_specific_game(size, game_number):

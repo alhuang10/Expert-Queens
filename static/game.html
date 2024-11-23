@@ -137,7 +137,18 @@
             border-radius: 5px;
             cursor: pointer;
         }
-        
+        .save-state-button {
+            transition: all 0.3s ease;
+        }
+
+        .save-state-button.has-saved {
+            background-color: #ff9800; /* Orange color */
+        }
+
+        .save-state-button.has-saved:hover {
+            background-color: #f57c00; /* Darker orange on hover */
+        }
+
         button:hover {
             background-color: #45a049;
         }
@@ -238,6 +249,12 @@
             <div class="timer">{{ formattedTime }}</div>
             <button @click="startNewGame">New Game</button>
             <button @click="resetGame" class="reset">Reset Current Game</button>
+            <button 
+                @click="saveOrRevertState" 
+                class="save-state-button"
+                :class="{ 'has-saved': hasSavedState }">
+                {{ hasSavedState ? 'Revert State' : 'Save State' }}
+            </button>
             <button @click="backToMenu">Back to Menu</button>
         </div>
         <div class="board-container">
@@ -324,7 +341,8 @@
                     initialMarkState: null,
                     startTime: null,
                     elapsedTime: 0,
-                    timerInterval: null
+                    timerInterval: null,
+                    hasSavedState: false
                 }
             },
             computed: {
@@ -341,6 +359,42 @@
                 }
             },
             methods: {
+                async saveState() {
+                    const response = await fetch('/api/save_state', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                    if (response.ok) {
+                        this.hasSavedState = true;
+                    }
+                },
+                
+                async revertState() {
+                    const response = await fetch('/api/revert_state', {
+                        method: 'POST',
+                        credentials: 'include'
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Need to update the state properly to trigger Vue reactivity
+                        this.state = {
+                            ...this.state,
+                            marks: data.marks
+                        };
+                        this.hasSavedState = false;
+                    } else {
+                        console.error("Failed to revert state"); // Debug log
+                    }
+                },
+                
+                async saveOrRevertState() {
+                    if (!this.hasSavedState) {
+                        await this.saveState();
+                    } else {
+                        await this.revertState();
+                    }
+                },
+
                 startTimer() {
                     // Clear any existing timer
                     if (this.timerInterval) {
@@ -462,6 +516,7 @@
                         this.state.marks = Array(this.state.size).fill().map(() => 
                             Array(this.state.size).fill(0)
                         );
+                        this.hasSavedState = false;
                     }
                 },
                 async loadState() {
@@ -577,6 +632,8 @@
                     const urlParams = new URLSearchParams(window.location.search);
                     const size = urlParams.get('size');
                     
+                    this.hasSavedState = false;
+
                     if (size >= 12) {
                         window.location.href = `/select_game/${size}`;
                     } else {
