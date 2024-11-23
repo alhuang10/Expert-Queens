@@ -490,50 +490,83 @@
                 },
                 checkVictory() {
                     const regionQueens = new Array(this.state.size).fill(0);
+                    const queenPositions = [];
+                    const usedRows = new Set();
+                    const usedCols = new Set();
+                    
+                    // Collect queen positions and check region constraints
                     for (let i = 0; i < this.state.size; i++) {
                         for (let j = 0; j < this.state.size; j++) {
                             if (this.state.marks[i][j] === 2) {
+                                queenPositions.push([i, j]);
                                 regionQueens[this.state.regions[i][j]]++;
+                                
+                                // Check if we have more than one queen in a region
+                                if (regionQueens[this.state.regions[i][j]] > 1) {
+                                    return;
+                                }
+                                
+                                // Check row and column constraints
+                                if (usedRows.has(i) || usedCols.has(j)) {
+                                    return;
+                                }
+                                usedRows.add(i);
+                                usedCols.add(j);
                             }
                         }
                     }
-                    if (regionQueens.every(count => count === 1)) {
-                        this.stopTimer();
-                        this.showVictoryModal = true;
+                    // Check if we have exactly one queen per region
+                    if (!regionQueens.every(count => count === 1)) {
+                        return;
+                    }
+                    // Check adjacency constraints
+                    for (let i = 0; i < queenPositions.length; i++) {
+                        const [row1, col1] = queenPositions[i];
+                        for (let j = i + 1; j < queenPositions.length; j++) {
+                            const [row2, col2] = queenPositions[j];
+                            
+                            // Check if queens are adjacent (including diagonally)
+                            if (Math.abs(row1 - row2) <= 1 && Math.abs(col1 - col2) <= 1) {
+                                return;
+                            }
+                        }
+                    }
+
+                    this.stopTimer();
+                    this.showVictoryModal = true;
+                    
+                    // Mark puzzle as completed if it's a pre-generated puzzle
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const size = parseInt(urlParams.get('size'));
+                    const gameNumber = parseInt(urlParams.get('game')) + 1;
+                    
+                    if (size >= 12) {  // Only track pre-generated puzzles
+                        // Get existing completion data
+                        const completionData = JSON.parse(localStorage.getItem('puzzleCompletionData') || '{}');
                         
-                        // Mark puzzle as completed if it's a pre-generated puzzle
-                        const urlParams = new URLSearchParams(window.location.search);
-                        const size = parseInt(urlParams.get('size'));
-                        const gameNumber = parseInt(urlParams.get('game')) + 1;
+                        // Initialize size entry if it doesn't exist
+                        if (!completionData[size]) {
+                            completionData[size] = {};
+                        }
                         
-                        if (size >= 12) {  // Only track pre-generated puzzles
-                            // Get existing completion data
-                            const completionData = JSON.parse(localStorage.getItem('puzzleCompletionData') || '{}');
-                            
-                            // Initialize size entry if it doesn't exist
-                            if (!completionData[size]) {
-                                completionData[size] = {};
-                            }
-                            
-                            // Store completion time if it's better than previous or first completion
-                            if (!completionData[size][gameNumber] || 
-                                completionData[size][gameNumber].timeMs > this.elapsedTime) {
-                                completionData[size][gameNumber] = {
-                                    timeMs: this.elapsedTime,
-                                    completedAt: Date.now()
-                                };
-                                localStorage.setItem('puzzleCompletionData', JSON.stringify(completionData));
-                            }
-                            
-                            // Also maintain the existing completion tracking
-                            const completed = JSON.parse(localStorage.getItem('completedPuzzles') || '{}');
-                            if (!completed[size]) {
-                                completed[size] = [];
-                            }
-                            if (!completed[size].includes(gameNumber)) {
-                                completed[size].push(gameNumber);
-                                localStorage.setItem('completedPuzzles', JSON.stringify(completed));
-                            }
+                        // Store completion time if it's better than previous or first completion
+                        if (!completionData[size][gameNumber] || 
+                            completionData[size][gameNumber].timeMs > this.elapsedTime) {
+                            completionData[size][gameNumber] = {
+                                timeMs: this.elapsedTime,
+                                completedAt: Date.now()
+                            };
+                            localStorage.setItem('puzzleCompletionData', JSON.stringify(completionData));
+                        }
+                        
+                        // Also maintain the existing completion tracking
+                        const completed = JSON.parse(localStorage.getItem('completedPuzzles') || '{}');
+                        if (!completed[size]) {
+                            completed[size] = [];
+                        }
+                        if (!completed[size].includes(gameNumber)) {
+                            completed[size].push(gameNumber);
+                            localStorage.setItem('completedPuzzles', JSON.stringify(completed));
                         }
                     }
                 },
