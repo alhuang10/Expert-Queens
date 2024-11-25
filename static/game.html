@@ -376,14 +376,14 @@
                     });
                     if (response.ok) {
                         const data = await response.json();
-                        // Need to update the state properly to trigger Vue reactivity
+                        // Create a new array for marks to ensure reactivity
                         this.state = {
                             ...this.state,
-                            marks: data.marks
+                            marks: data.marks.map(row => [...row])  // Deep copy the marks array
                         };
                         this.hasSavedState = false;
                     } else {
-                        console.error("Failed to revert state"); // Debug log
+                        console.error("Failed to revert state");
                     }
                 },
                 
