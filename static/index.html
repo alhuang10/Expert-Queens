@@ -8,10 +8,12 @@
             font-family: Arial, sans-serif;
             display: flex;
             justify-content: center;
-            align-items: center;
-            height: 100vh;
+            align-items: flex-start;
             margin: 0;
             background-color: #f0f0f0;
+            overflow-y: auto;  /* Add this */
+            min-height: 100vh; /* Add this */
+            padding: 2rem 0;  /* Add some padding to top/bottom */
         }
         
         .container {
@@ -66,6 +68,150 @@
             margin-left: auto;      /* Centers the text block */
             margin-right: auto;
         }
+
+        .progress-container {
+            text-align: center;
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            width: 400px;
+            max-width: 90vw;
+            margin-top: 2rem;
+        }
+
+        .progress-grid {
+            display: grid;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .progress-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+
+        .progress-item .size {
+            font-weight: bold;
+        }
+
+        .progress-item .progress-bar {
+            flex-grow: 1;
+            height: 20px;
+            background-color: #ddd;
+            border-radius: 10px;
+            margin: 0 1rem;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-item .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.3s ease;
+        }
+
+        .progress-item .progress-text {
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .faq-container {
+            text-align: center;
+            background: white;
+            padding: 0.5rem 2rem;  /* First value is top/bottom, second is left/right */
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            width: 400px;  /* Same as other containers */
+            max-width: 90vw;
+            margin-top: 2rem;
+        }
+
+
+        .faq-button {
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 1.2rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            color: #333;
+        }
+
+        .arrow {
+            transition: transform 0.3s ease;
+        }
+
+        .arrow.rotated {
+            transform: rotate(180deg);
+        }
+
+        .faq-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            position: relative; /* Add this */
+        }
+
+        .faq-content.expanded {
+            max-height: 5000px; /* Adjust this value based on content */
+        }
+
+        .faq-text {
+            text-align: left;
+            padding: 1rem;
+        }
+
+        .faq-text h3 {
+            color: #333;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .faq-text ul {
+            list-style: none;
+            padding-left: 1rem;
+            margin: 0.5rem 0;
+        }
+
+        .faq-text li {
+            margin: 0.5rem 0;
+            color: #555;
+        }
+
+        .container, .progress-container, .faq-container {
+            position: relative;
+            overflow: visible;
+        }
+        .faq-item {
+            margin-bottom: 1.5rem;  /* Space between Q&A pairs */
+        }
+
+        .question {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 0.5rem;  /* Space between question and its answer */
+        }
+
+        .question::before {
+            content: "Q: ";
+            color: #4CAF50;  /* Green color to match your theme */
+        }
+
+        .answer {
+            margin: 0;
+            color: #555;
+            padding-left: 1rem;  /* Indent the answer */
+        }
+    
     </style>
 </head>
 <body>
@@ -93,9 +239,125 @@
                 {{ selectedSize >= 12 ? 'Choose Puzzle' : 'Generate Puzzle' }}
             </button>
         </div>
+        <div class="progress-container">
+            <h2>Your Progress</h2>
+            <div class="progress-grid" id="progressGrid">
+            </div>
+        </div>
+        <div class="container faq-container">
+            <button class="faq-button" onclick="toggleDropdown('rulesContent', 'rulesArrow')">
+                <h3>Rules/Controls</h3>
+                <span class="arrow" id="rulesArrow">▼</span>
+            </button>
+            <div class="faq-content" id="rulesContent">
+                <div class="faq-text">
+                    <h3>Rules:</h3>
+                    <ul>
+                        <li>Place queens on the board following these rules:</li>
+                        <li>- No two queens can share the same row or column</li>
+                        <li>- Queens cannot be placed in adjacent squares (including diagonally)</li>
+                        <li>- Each colored region must contain exactly one queen</li>
+                    </ul>
+                    <h3>Controls:</h3>
+                    <ul>
+                        <li>Click to cycle: Empty → X → Queen</li>
+                        <li>Click and drag to mark multiple X's quickly</li>
+                        <li>Use "Save State" to temporarily save your progress during a puzzle.
+                            Click the button again to "Revert State" back to that point.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="container faq-container">
+            <button class="faq-button" onclick="toggleDropdown('faqContent', 'faqArrow')">
+                <h3>FAQ</h3>
+                <span class="arrow" id="faqArrow">▼</span>
+            </button>
+            <div class="faq-content" id="faqContent">
+                <div class="faq-text">
+                    <div class="faq-item">
+                        <p class="question">Why did you make this?</p>
+                        <p class="answer">I got really into this game and wanted 
+                            harder/larger boards. I wasn't able to find anything 
+                            larger than 12x12 boards so I decided to try creating 
+                            them myself!
+                        </p>
+                    </div>
+                    <div class="faq-item">
+                        <p class="question">How did you create the boards?</p>
+                        <p class="answer">It was more challenging than expected to 
+                            generate large boards that have a unique solution. Random
+                            color fill starting with a valid queen arrangement starts
+                            taking really long to find boards even for a 10x10 board. I 
+                            ended up having to implement checks and heuristics for placing 
+                            colors such that we maintain solution uniqueness each iteration while 
+                            minimizing the chance we reach a dead end where any color 
+                            we place results in a non-unique solution board. Shout out to
+                            my friends Mark and Jo for some discussions that to a working 
+                            generation process. You can take a look the code
+                            <a href="https://github.com/alhuang10/hard_queens_game"> 
+                            here.</a>
+                        </p>
+                    <div class="faq-item">
+                        <p class="question">Puzzle X is impossible!</p>
+                        <p class="answer">I'm fairly confident that the existence of a
+                            unique solution implies existence of some reasonable way of
+                            solving it. You might just have to place a hypothetical queen and
+                            go pretty far down the solve tree before finding a contradiction.
+                            The "Save State" button will help a lot for this. I've solved
+                            most of the puzzles here but not all of them so it's possible
+                            I haven't encountered a super impossible one yet.
+                        </p>
+                    </div>
+                    <div class="faq-item">
+                        <p class="question">I found an issue/I have some feedback! How do I get in touch with you?</p>
+                        <p class="answer">Feel free to email me at my github username @ gmail.</p>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>        
     </div>
 
     <script>
+        async function loadProgress() {
+            const progressGrid = document.getElementById('progressGrid');
+            const completionData = JSON.parse(localStorage.getItem('puzzleCompletionData') || '{}');
+            
+            for (let size = 12; size <= 15; size++) {
+                const response = await fetch(`/api/available_games/${size}`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const totalGames = data.games.length;
+                    const completedGames = completionData[size] ? Object.keys(completionData[size]).length : 0;
+                    const percentage = totalGames > 0 ? Math.round((completedGames / totalGames) * 100) : 0;
+                    
+                    const progressItem = document.createElement('div');
+                    progressItem.className = 'progress-item';
+                    progressItem.innerHTML = `
+                        <span class="size">${size}x${size}</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${percentage}%"></div>
+                        </div>
+                        <span class="progress-text">
+                            ${completedGames}/${totalGames} (${percentage}%)
+                        </span>
+                    `;
+                    progressGrid.appendChild(progressItem);
+                }
+            }
+        }
+
+        function toggleDropdown(contentId, arrowId) {
+            const content = document.getElementById(contentId);
+            const arrow = document.getElementById(arrowId);
+            content.classList.toggle('expanded');
+            arrow.classList.toggle('rotated');
+        }
         const { createApp } = Vue;
         
         const app = createApp({
@@ -122,6 +384,7 @@
         });
 
         app.mount('#app');
+        document.addEventListener('DOMContentLoaded', loadProgress);
     </script>
 </body>
 </html>
