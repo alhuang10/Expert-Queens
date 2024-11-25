@@ -359,31 +359,29 @@
                 }
             },
             methods: {
-                async saveState() {
-                    const response = await fetch('/api/save_state', {
-                        method: 'POST',
-                        credentials: 'include'
-                    });
-                    if (response.ok) {
-                        this.hasSavedState = true;
-                    }
+                saveState() {
+                    // Save current marks array to localStorage
+                    localStorage.setItem('savedGameState', JSON.stringify({
+                        marks: this.state.marks,
+                        size: this.state.size,
+                        regions: this.state.regions // Include regions to validate it's the same board
+                    }));
+                    this.hasSavedState = true;
                 },
                 
-                async revertState() {
-                    const response = await fetch('/api/revert_state', {
-                        method: 'POST',
-                        credentials: 'include'
-                    });
-                    if (response.ok) {
-                        const data = await response.json();
-                        // Create a new array for marks to ensure reactivity
+                revertState() {
+                    const savedState = JSON.parse(localStorage.getItem('savedGameState'));
+                    
+                    // Validate it's for the same board
+                    if (savedState && 
+                        savedState.size === this.state.size && 
+                        JSON.stringify(savedState.regions) === JSON.stringify(this.state.regions)) {
                         this.state = {
                             ...this.state,
-                            marks: data.marks.map(row => [...row])  // Deep copy the marks array
+                            marks: savedState.marks.map(row => [...row]) // Deep copy
                         };
                         this.hasSavedState = false;
-                    } else {
-                        console.error("Failed to revert state");
+                        localStorage.removeItem('savedGameState'); // Clear saved state after using it
                     }
                 },
                 
@@ -629,6 +627,10 @@
                     this.showVictoryModal = false;
                 },
                 async startNewGame() {
+                    // Clear any saved state when starting new game
+                    localStorage.removeItem('savedGameState');
+                    this.hasSavedState = false;
+                    
                     const urlParams = new URLSearchParams(window.location.search);
                     const size = urlParams.get('size');
                     
