@@ -15,6 +15,6 @@ that were optimized for difficulty.
 It turns out creating large boards of this game with unique solutions is quite 
 tricky but after a lot of trial and error I managed to make it work with some fairly involved heuristics and logic. The logic can be found in `board_generator.py`. 
 
-Play the puzzles I created at [expertqueens.com](expertqueens.com)! The boards there were selected
+Play the puzzles I created at [expertqueens.com](http://www.expertqueens.com)! The boards there were selected
 from thousands of generations to be as difficult and interesting to play as possible.
 If you can solve game 7 or 10 of 15x15 kudos to you!
