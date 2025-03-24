@@ -157,16 +157,6 @@ def get_state():
         return jsonify({'error': 'No game started'}), 400
     return jsonify(game.to_dict())
 
-@app.route('/api/toggle/<int:row>/<int:col>')
-def toggle_mark(row, col):
-    game = game_manager.get_game_state()
-    if game is None:
-        return jsonify({'error': 'No game started'}), 400
-        
-    new_mark = game.toggle_mark(row, col)
-    game_manager.save_game_state(game)
-    return jsonify({'mark': int(new_mark)})
-
 @app.route('/')
 def serve_landing():
     return send_from_directory('static', 'index.html')

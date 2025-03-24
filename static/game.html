@@ -487,23 +487,19 @@
                     }
                 },
 
-                async toggleMarkX(row, col) {
-                    if (this.state.marks[row][col] === 0) {
-                        const response = await fetch(`/api/toggle/${row}/${col}`, {
-                            credentials: 'include'
-                        });
-                        const data = await response.json();
-                        this.state.marks[row][col] = data.mark;
-                    }
+                toggleMark(row, col) {
+                    // Cycle 0->1->2->0 locally
+                    // 0 = empty, 1 = X, 2 = queen
+                    this.state.marks[row][col] = (this.state.marks[row][col] + 1) % 3;
+                    this.checkVictory();
                 },
 
-                async toggleMark(row, col) {
-                    const response = await fetch(`/api/toggle/${row}/${col}`, {
-                        credentials: 'include'
-                    });
-                    const data = await response.json();
-                    this.state.marks[row][col] = data.mark;
-                    this.checkVictory();
+                toggleMarkX(row, col) {
+                    // Called when dragging over an empty cell to mark it with 'X'
+                    // Just set it to X (1) locally
+                    if (this.state.marks[row][col] === 0) {
+                        this.state.marks[row][col] = 1;
+                    }
                 },
                 async resetGame() {
                     const response = await fetch('/api/reset', {
