@@ -43,10 +43,6 @@ class GameState:
         self.regions = np.array(data['regions']) if data['regions'] is not None else None
         self.marks = np.array(data['marks']) if data['marks'] is not None else None
 
-    def toggle_mark(self, row, col):
-        self.marks[row, col] = (self.marks[row, col] + 1) % 3
-        return self.marks[row, col]
-
     def reset_marks(self):
         """Reset all marks while preserving the board layout"""
         if self.marks is not None:
